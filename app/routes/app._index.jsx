@@ -1,14 +1,14 @@
-import { useLoaderData, useFetcher, Link } from "react-router";
+import { useLoaderData, Link } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server.js";
-import { getDashboardMetrics, seedDemoReviews } from "../models/review.server.js";
+import { getDashboardMetrics } from "../models/review.server.js";
 import { StoreReviews } from "../models/review.model.js";
 import { connectDB } from "../db.server.js";
 import { MetricCard } from "../components/MetricCard.jsx";
 import { RatingBreakdown } from "../components/RatingBreakdown.jsx";
 import { StarRating } from "../components/StarRating.jsx";
-import { Star, MessageSquare, Clock, Send, Sparkles, CheckCircle2, ArrowRight } from "lucide-react";
+import { Star, MessageSquare, Clock, Send, CheckCircle2, ArrowRight } from "lucide-react";
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
@@ -28,27 +28,8 @@ export const loader = async ({ request }) => {
   return { metrics, recentReviews };
 };
 
-export const action = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
-  const formData = await request.formData();
-  const intent = formData.get("intent");
-
-  if (intent === "seed_demo") {
-    await seedDemoReviews(session.shop);
-    return { success: true, message: "Demo data created" };
-  }
-
-  return null;
-};
-
 export default function DashboardPage() {
   const { metrics, recentReviews } = useLoaderData();
-  const fetcher = useFetcher();
-  const isSeeding = fetcher.state === "submitting";
-
-  const handleSeed = () => {
-    fetcher.submit({ intent: "seed_demo" }, { method: "POST" });
-  };
 
   return (
     <div className="reviora-page-wrapper">
@@ -146,23 +127,6 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div style={{ borderTop: "1px solid #E1E3E5", paddingTop: "16px" }}>
-            <p style={{ fontSize: "13px", color: "#6D7175", margin: "0 0 10px 0" }}>
-              {metrics.totalReviews === 0
-                ? "Want to test widgets immediately? Populate sample reviews with photos and replies:"
-                : "Generate additional sample reviews with photo uploads and replies:"}
-            </p>
-            <button
-              type="button"
-              className="reviora-btn reviora-btn-primary"
-              onClick={handleSeed}
-              disabled={isSeeding}
-              style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
-            >
-              <Sparkles size={14} />
-              {isSeeding ? "Generating..." : "Populate 4 Sample Reviews"}
-            </button>
-          </div>
         </div>
       </div>
 
@@ -182,7 +146,7 @@ export default function DashboardPage() {
           <div style={{ textAlign: "center", padding: "32px 16px", color: "#6D7175" }}>
             <p style={{ fontSize: "14px", margin: "0 0 6px 0", fontWeight: "500" }}>No reviews collected yet</p>
             <p style={{ fontSize: "13px", margin: 0 }}>
-              Click <strong>&ldquo;Populate 4 Sample Reviews&rdquo;</strong> above to preview data right away.
+              Customer reviews will appear here once submitted on your store or imported.
             </p>
           </div>
         ) : (

@@ -15,10 +15,11 @@ const ReviewRequestSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["SCHEDULED", "SENT", "COMPLETED", "CANCELLED"],
+      enum: ["SCHEDULED", "SENT", "COMPLETED", "CANCELLED", "FAILED"],
       default: "SCHEDULED",
       index: true,
     },
+    errorMessage: { type: String },
     scheduledAt: { type: Date, default: Date.now },
     sentAt: { type: Date },
     token: { type: String, required: true, unique: true },
@@ -36,6 +37,8 @@ ReviewRequestSchema.virtual("id").get(function () {
 ReviewRequestSchema.set("toJSON", { virtuals: true });
 ReviewRequestSchema.set("toObject", { virtuals: true });
 
-export const ReviewRequest =
-  mongoose.models.ReviewRequest ||
-  mongoose.model("ReviewRequest", ReviewRequestSchema);
+if (mongoose.models.ReviewRequest) {
+  delete mongoose.models.ReviewRequest;
+}
+
+export const ReviewRequest = mongoose.model("ReviewRequest", ReviewRequestSchema);

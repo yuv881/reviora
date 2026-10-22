@@ -20,7 +20,7 @@ export default function BillingPage() {
     },
     {
       name: "Growth",
-      price: "$15",
+      price: "$4.99",
       period: "per month",
       description: "For growing brands wanting unlimited collection and photo reviews.",
       features: [
