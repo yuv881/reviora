@@ -1,0 +1,841 @@
+/* Reviora Reviews Widget Styles */
+.reviora-widget-container {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  max-width: 1000px;
+  margin: 40px auto;
+  padding: 0 16px;
+  color: #1f2937;
+  box-sizing: border-box;
+}
+
+.reviora-header {
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 24px;
+  margin-bottom: 24px;
+}
+
+.reviora-summary-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  align-items: center;
+}
+
+.reviora-avg-box {
+  text-align: center;
+  min-width: 140px;
+}
+
+.reviora-avg-number {
+  font-size: 48px;
+  font-weight: 800;
+  line-height: 1;
+  color: #111827;
+}
+
+.reviora-stars {
+  font-size: 20px;
+  letter-spacing: 2px;
+}
+
+.reviora-bars {
+  flex: 1;
+  min-width: 250px;
+}
+
+.reviora-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.reviora-bar-track {
+  flex: 1 1 auto !important;
+  height: 8px !important;
+  min-height: 8px !important;
+  background-color: #f1f5f9 !important;
+  border-radius: 999px !important;
+  overflow: hidden !important;
+  position: relative !important;
+  display: block !important;
+}
+
+.reviora-bar-fill {
+  height: 100% !important;
+  min-height: 8px !important;
+  display: block !important;
+  border-radius: 999px !important;
+  background-color: #FFB800;
+  transition: width 0.3s ease;
+}
+
+.reviora-write-btn {
+  background-color: #111827;
+  color: #ffffff;
+  padding: 12px 24px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.reviora-write-btn:hover {
+  background-color: #1f2937;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.reviora-write-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Reviews List */
+.reviora-card {
+  border-bottom: 1px solid #f3f4f6;
+  padding: 20px 0;
+}
+
+.reviora-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 6px;
+}
+
+.reviora-author {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.reviora-badge {
+  font-size: 12px;
+  font-weight: 600;
+  margin-left: 8px;
+  color: #108043;
+  background: #f0fdf4;
+  padding: 2px 8px;
+  border-radius: 12px;
+  border: 1px solid #bbf7d0;
+}
+
+.reviora-date {
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.reviora-card-title {
+  font-weight: 700;
+  font-size: 15px;
+  margin: 6px 0;
+}
+
+.reviora-card-body {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #4b5563;
+  margin: 8px 0;
+}
+
+.reviora-media-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.reviora-media-img {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.reviora-media-img:hover {
+  opacity: 0.85;
+}
+
+.reviora-reply-box {
+  background-color: #f9fafb;
+  border-left: 3px solid #111827;
+  padding: 12px 16px;
+  margin-top: 12px;
+  border-radius: 0 6px 6px 0;
+  font-size: 13px;
+}
+
+.reviora-helpful-btn {
+  background: none;
+  border: 1px solid #e5e7eb;
+  padding: 5px 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  cursor: pointer;
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #4b5563;
+  transition: all 0.15s ease;
+}
+
+.reviora-helpful-btn:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+/* =========================================================
+   MODAL POPUP (Compact Height, Responsive, & Scrollable)
+   ========================================================= */
+body.reviora-modal-open {
+  overflow: hidden !important;
+}
+
+.reviora-modal-backdrop {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background: rgba(15, 23, 42, 0.45) !important;
+  backdrop-filter: blur(3px) !important;
+  -webkit-backdrop-filter: blur(3px) !important;
+  display: none;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 2147483647 !important;
+  padding: 16px !important;
+  box-sizing: border-box !important;
+  animation: revioraFadeIn 0.2s ease-out;
+}
+
+.reviora-modal-backdrop.is-active {
+  display: flex !important;
+}
+
+.reviora-modal-backdrop.is-hidden {
+  display: none !important;
+}
+
+@keyframes revioraFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes revioraScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.reviora-modal {
+  background: #ffffff !important;
+  border-radius: 16px !important;
+  max-width: 480px !important;
+  width: 100% !important;
+  max-height: calc(100vh - 32px) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.06) !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  position: relative !important;
+  animation: revioraScaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reviora-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f1f5f9;
+  background: #ffffff;
+  flex-shrink: 0;
+}
+
+.reviora-modal-title-group h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+
+.reviora-modal-subtitle {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #64748b;
+  max-width: 380px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reviora-close-btn {
+  background: #f1f5f9;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  margin-left: 10px;
+}
+
+.reviora-close-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.reviora-modal-body {
+  padding: 16px 20px 20px;
+  overflow-y: auto !important;
+  box-sizing: border-box;
+  overscroll-behavior: contain;
+  flex: 1 1 auto;
+}
+
+/* Star Selector Component inside Modal */
+.reviora-star-picker-wrapper {
+  margin-bottom: 14px;
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  border-radius: 10px;
+  padding: 10px 14px;
+  text-align: center;
+}
+
+.reviora-star-picker-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.reviora-interactive-stars {
+  display: inline-flex;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.reviora-star-btn {
+  background: none;
+  border: none;
+  font-size: 28px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.15s ease, color 0.15s ease;
+  user-select: none;
+}
+
+.reviora-star-btn:hover {
+  transform: scale(1.15);
+}
+
+.reviora-star-text-badge {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+  margin-top: 4px;
+}
+
+/* Form controls */
+.reviora-form-field {
+  margin-bottom: 12px;
+}
+
+.reviora-form-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 4px;
+}
+
+.reviora-input,
+.reviora-textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #0f172a;
+  background: #ffffff;
+  box-sizing: border-box;
+  font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.reviora-input:focus,
+.reviora-textarea:focus {
+  outline: none;
+  border-color: #0f172a;
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.08);
+}
+
+/* Red error highlight and validation message */
+.reviora-input.reviora-input-error,
+.reviora-textarea.reviora-input-error {
+  border-color: #ef4444 !important;
+  background-color: #fffafb !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15) !important;
+}
+
+.reviora-error-msg {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #ef4444;
+  margin-top: 4px;
+  animation: revioraFadeIn 0.15s ease-out;
+}
+
+.reviora-toast-banner {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  animation: revioraFadeIn 0.2s ease-out;
+}
+
+.reviora-textarea {
+  resize: vertical;
+  min-height: 70px;
+}
+
+.reviora-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 480px) {
+  .reviora-form-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+}
+
+.reviora-submit-row {
+  margin-top: 16px;
+  display: flex;
+  gap: 8px;
+}
+
+.reviora-cancel-btn {
+  background: #f1f5f9;
+  color: #475569;
+  padding: 10px 18px;
+  border-radius: 6px;
+  border: none;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.reviora-cancel-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+/* Success Celebration Animation Styles */
+.reviora-success-view {
+  text-align: center;
+  padding: 32px 16px 24px;
+  animation: revioraFadeIn 0.3s ease-out;
+}
+
+.reviora-success-icon-wrap {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 20px;
+}
+
+.reviora-success-ring {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #ecfdf5;
+  border: 2px solid #a7f3d0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: revioraPopRing 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.reviora-checkmark-svg {
+  width: 36px;
+  height: 36px;
+  stroke: #059669;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: revioraDrawCheck 0.4s ease-out 0.25s forwards;
+}
+
+@keyframes revioraPopRing {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes revioraDrawCheck {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.reviora-success-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 8px;
+  animation: revioraSlideUp 0.4s ease-out 0.15s both;
+}
+
+.reviora-success-sub {
+  font-size: 14px;
+  color: #64748b;
+  line-height: 1.5;
+  margin: 0 0 24px;
+  animation: revioraSlideUp 0.4s ease-out 0.25s both;
+}
+
+.reviora-success-badge-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 24px;
+  animation: revioraSlideUp 0.4s ease-out 0.35s both;
+}
+
+@keyframes revioraSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
+.reviora-full-width {
+  flex: 1;
+}
+
+/* =========================================================
+   TWO-STEP REVIEW SUBMISSION WIZARD & MEDIA UPLOAD
+   ========================================================= */
+.reviora-step-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.reviora-step-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  transition: all 0.2s ease;
+}
+
+.reviora-step-pill.is-active {
+  color: #0f172a;
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.reviora-step-pill.is-done {
+  color: #108043;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.reviora-step-circle {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: currentColor;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.reviora-step-pill.is-active .reviora-step-circle {
+  background: #0f172a;
+}
+
+.reviora-step-pill.is-done .reviora-step-circle {
+  background: #108043;
+}
+
+.reviora-step-arrow {
+  color: #cbd5e1;
+  font-size: 12px;
+}
+
+/* Step 2 Media Uploader */
+.reviora-dropzone {
+  display: block;
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  box-sizing: border-box;
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 24px 16px;
+  text-align: center;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.reviora-dropzone:hover {
+  border-color: #0f172a;
+  background: #f1f5f9;
+}
+
+.reviora-dropzone:focus-visible {
+  outline: 2px solid #008060;
+  outline-offset: 2px;
+}
+
+.reviora-dropzone-icon {
+  font-size: 32px;
+  line-height: 1;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.reviora-dropzone-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.reviora-dropzone-sub {
+  font-size: 11px;
+  color: #64748b;
+  display: block;
+}
+
+.reviora-preview-grid {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.reviora-preview-thumb {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+}
+
+.reviora-preview-thumb img,
+.reviora-preview-thumb video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.reviora-remove-thumb {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+/* Upgrade Notice Card if Plan is FREE */
+.reviora-plan-locked-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px 16px;
+  text-align: center;
+}
+
+.reviora-plan-locked-badge {
+  display: inline-block;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 3px 8px;
+  border-radius: 12px;
+  margin-bottom: 8px;
+}
+
+.reviora-plan-locked-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 4px 0;
+}
+
+.reviora-plan-locked-desc {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.reviora-loading-text,
+.reviora-empty-text {
+  text-align: center;
+  color: #64748b;
+  padding: 24px;
+}
+
+.reviora-empty-state {
+  text-align: center;
+  padding: 36px 0;
+  color: #64748b;
+}
+
+.reviora-empty-title {
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.reviora-empty-sub {
+  font-size: 13px;
+}
+
+.reviora-title {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.reviora-subtext {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.reviora-bar-count {
+  color: #64748b;
+  width: 30px;
+}
+
+/* Review Card Media (Images & Videos) */
+.reviora-media-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.reviora-media-img {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+  background: #000;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.reviora-media-img:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+video.reviora-media-img {
+  cursor: default;
+}
+

@@ -1,0 +1,257 @@
+/* Reviora Admin Global Styles - Stitch & Polaris Layout System */
+:root {
+  --p-color-bg: #F6F6F7;
+  --p-color-surface: #FFFFFF;
+  --p-color-border: #E1E3E5;
+  --p-color-text: #202223;
+  --p-color-text-subdued: #6D7175;
+  --p-color-primary: #008060;
+  --p-color-primary-hover: #00654b;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--p-color-bg);
+  color: var(--p-color-text);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "San Francisco", "Segoe UI", Roboto, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Page wrapper for uniform spacing */
+.reviora-page-wrapper {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px 24px 16px;
+  box-sizing: border-box;
+}
+
+/* Stitch Card Containers */
+.reviora-card {
+  background: #ffffff;
+  border: 1px solid #E1E3E5;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  margin-bottom: 16px;
+  box-sizing: border-box;
+}
+
+.reviora-card:last-child {
+  margin-bottom: 0;
+}
+
+/* Form inputs & selects */
+.reviora-input,
+.reviora-select,
+.reviora-textarea {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 20px;
+  color: #202223;
+  background-color: #ffffff;
+  border: 1px solid #C9CCCF;
+  border-radius: 6px;
+  box-sizing: border-box;
+  font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.reviora-input:focus,
+.reviora-select:focus,
+.reviora-textarea:focus {
+  outline: none;
+  border-color: #008060;
+  box-shadow: 0 0 0 1px #008060;
+}
+
+/* Native buttons with Polaris appearance */
+.reviora-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.reviora-btn-primary {
+  background-color: #008060;
+  color: #ffffff;
+  border-color: #006e52;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.05);
+}
+
+.reviora-btn-primary:hover {
+  background-color: #00654b;
+}
+
+.reviora-btn-primary:disabled {
+  background-color: #8C9196;
+  border-color: #8C9196;
+  cursor: not-allowed;
+}
+
+.reviora-btn-secondary {
+  background-color: #ffffff;
+  color: #202223;
+  border-color: #C9CCCF;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.05);
+}
+
+.reviora-btn-secondary:hover {
+  background-color: #F6F6F7;
+  border-color: #BABFC3;
+}
+
+.reviora-btn-critical {
+  background-color: #ffffff;
+  color: #D72C0D;
+  border-color: #C9CCCF;
+}
+
+.reviora-btn-critical:hover {
+  background-color: #FDE7E7;
+  border-color: #D72C0D;
+}
+
+.reviora-btn-plain {
+  background: transparent;
+  color: #005BD3;
+  border: none;
+  padding: 4px 8px;
+}
+
+.reviora-btn-plain:hover {
+  text-decoration: underline;
+}
+
+/* Badge pills */
+.reviora-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: 0.02em;
+}
+
+.reviora-badge-success {
+  background-color: #E3F1DF;
+  color: #108043;
+}
+
+.reviora-badge-warning {
+  background-color: #FCF1CD;
+  color: #916A00;
+}
+
+.reviora-badge-critical {
+  background-color: #FDE7E7;
+  color: #D72C0D;
+}
+
+.reviora-badge-info {
+  background-color: #E4F0F6;
+  color: #006E52;
+}
+
+/* Skeleton Loading Animation */
+@keyframes reviora-pulse {
+  0% {
+    opacity: 1;
+    background-color: #EAECEE;
+  }
+
+  50% {
+    opacity: 0.45;
+    background-color: #F4F5F6;
+  }
+
+  100% {
+    opacity: 1;
+    background-color: #EAECEE;
+  }
+}
+
+.reviora-skeleton-pulse {
+  animation: reviora-pulse 1.4s ease-in-out infinite;
+  background-color: #EAECEE;
+}
+
+@keyframes reviora-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.reviora-spin {
+  animation: reviora-spin 0.8s linear infinite;
+}
+
+/* Admin CSV Dropzone */
+.reviora-admin-dropzone {
+  display: block;
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  border: 2px dashed #BABFC3;
+  border-radius: 10px;
+  padding: 36px 24px;
+  text-align: center;
+  background-color: #FAFAFA;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  margin-bottom: 16px;
+  position: relative;
+  user-select: none;
+  box-sizing: border-box;
+}
+
+.reviora-admin-dropzone:hover,
+.reviora-admin-dropzone.is-dragging {
+  border-color: #008060;
+  background-color: #F0FDF4;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 128, 96, 0.08);
+}
+
+.reviora-admin-dropzone:focus-visible {
+  outline: 2px solid #008060;
+  outline-offset: 2px;
+}
+
+.reviora-admin-dropzone.has-file {
+  border-color: #108043;
+  background-color: #F6FCF7;
+  cursor: default;
+}
+
+.reviora-dropzone-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #E3F1DF;
+  color: #108043;
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
