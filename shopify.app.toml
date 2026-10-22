@@ -2,7 +2,7 @@
 
 client_id = "50548a2faa1165c52ac56db58bb8ee98"
 name = "Reviora"
-application_url = "https://example.com"
+application_url = "https://reviora-62qh.onrender.com"
 embedded = true
 
 [access_scopes]
@@ -45,7 +45,7 @@ api_version = "2027-01"
   topics = [ "app/scopes_update" ]
 
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [ "https://reviora-62qh.onrender.com/api/auth" ]
 
 [build]
 include_config_on_deploy = true
