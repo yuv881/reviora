@@ -104,6 +104,43 @@
       }
     }
 
+    renderMediaItem(m) {
+      const isVideo = m.mediaType === "VIDEO" || (m.url && /\.(mp4|webm|mov|ogg)($|\?)/i.test(m.url));
+      if (isVideo) {
+        return `<video src="${m.url}" class="reviora-media-img" controls playsinline preload="metadata"></video>`;
+      }
+      return `<a href="${m.url}" target="_blank" rel="noopener noreferrer" class="reviora-media-link" aria-label="Open review photo in new window"><img src="${m.url}" class="reviora-media-img" alt="Review photo" loading="lazy"></a>`;
+    }
+
+    renderReviewCard(r) {
+      const mediaHtml = (r.media || []).map((m) => this.renderMediaItem(m)).join("");
+      const replyHtml = r.replies && r.replies.length > 0
+        ? `<div class="reviora-reply-box"><strong>${r.replies[0].author || "Store Owner"}</strong><p>${r.replies[0].body}</p></div>`
+        : "";
+
+      return `
+        <div class="reviora-card">
+          <div class="reviora-card-top">
+            <div>
+              <span class="reviora-stars">${this.renderStars(r.rating)}</span>
+              <span class="reviora-author">${r.authorName}</span>
+              ${r.verified ? '<span class="reviora-badge">✓ Verified Buyer</span>' : ""}
+            </div>
+            <div class="reviora-date">${new Date(r.createdAt).toLocaleDateString()}</div>
+          </div>
+          ${r.title ? `<div class="reviora-card-title">${r.title}</div>` : ""}
+          <div class="reviora-card-body">${r.body}</div>
+          ${mediaHtml ? `<div class="reviora-media-row">${mediaHtml}</div>` : ""}
+          ${replyHtml}
+          <div>
+            <button type="button" class="reviora-helpful-btn" data-review-id="${r.id}">
+              👍 Helpful (${r.helpfulCount || 0})
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
     render(data) {
       const stats = data.stats || { total: 0, averageRating: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } };
       const reviews = data.reviews || [];
@@ -128,64 +165,17 @@
         })
         .join("");
 
-      const reviewsListHtml =
-        reviews.length === 0
-          ? `
-            <div class="reviora-empty-state">
-              <p class="reviora-empty-title">Be the first to review this product!</p>
-              <p class="reviora-empty-sub">Share your honest thoughts and help other shoppers make the best choice.</p>
-            </div>
-          `
-          : reviews
-              .map((r) => {
-                const mediaHtml = (r.media || [])
-                  .map((m) => {
-                    const isVideo = m.mediaType === "VIDEO" || (m.url && m.url.match(/\.(mp4|webm|mov|ogg)($|\?)/i));
-                    if (isVideo) {
-                      return `
-                        <video src="${m.url}" class="reviora-media-img" controls playsinline preload="metadata"></video>
-                      `;
-                    return `
-                      <a href="${m.url}" target="_blank" rel="noopener noreferrer" class="reviora-media-link" aria-label="Open review photo in new window">
-                        <img src="${m.url}" class="reviora-media-img" alt="Review photo" loading="lazy">
-                      </a>
-                    `;
-                  })
-                  .join("");
-
-                const replyHtml =
-                  r.replies && r.replies.length > 0
-                    ? `
-                      <div class="reviora-reply-box">
-                        <strong>${r.replies[0].author || "Store Owner"}</strong>
-                        <p>${r.replies[0].body}</p>
-                      </div>
-                    `
-                    : "";
-
-                return `
-                  <div class="reviora-card">
-                    <div class="reviora-card-top">
-                      <div>
-                        <span class="reviora-stars">${this.renderStars(r.rating)}</span>
-                        <span class="reviora-author">${r.authorName}</span>
-                        ${r.verified ? '<span class="reviora-badge">✓ Verified Buyer</span>' : ""}
-                      </div>
-                      <div class="reviora-date">${new Date(r.createdAt).toLocaleDateString()}</div>
-                    </div>
-                    ${r.title ? `<div class="reviora-card-title">${r.title}</div>` : ""}
-                    <div class="reviora-card-body">${r.body}</div>
-                    ${mediaHtml ? `<div class="reviora-media-row">${mediaHtml}</div>` : ""}
-                    ${replyHtml}
-                    <div>
-                      <button type="button" class="reviora-helpful-btn" data-review-id="${r.id}">
-                        👍 Helpful (${r.helpfulCount || 0})
-                      </button>
-                    </div>
-                  </div>
-                `;
-              })
-              .join("");
+      let reviewsListHtml = "";
+      if (reviews.length === 0) {
+        reviewsListHtml = `
+          <div class="reviora-empty-state">
+            <p class="reviora-empty-title">Be the first to review this product!</p>
+            <p class="reviora-empty-sub">Share your honest thoughts and help other shoppers make the best choice.</p>
+          </div>
+        `;
+      } else {
+        reviewsListHtml = reviews.map((r) => this.renderReviewCard(r)).join("");
+      }
 
       this.innerHTML = `
         <div class="reviora-widget-container">
