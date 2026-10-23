@@ -1,20 +1,73 @@
 import { useState, useEffect } from "react";
-import { useActionData, useNavigation, useSubmit, useFetcher } from "react-router";
-import {
-  Page,
-  Card,
-  BlockStack,
-  InlineStack,
-  DropZone,
-  Banner,
-  Button,
-  TextField,
-  Text,
-  Badge,
-  Box,
-} from "@shopify/polaris";
+import { useActionData, useNavigation, useSubmit, useFetcher, useNavigate } from "react-router";
 import { authenticate } from "../shopify.server.js";
-import { createReview, exportReviewsToCsv } from "../models/review.server.js";
+import { createReview, exportReviewsToCsv, verifyCustomerByEmail } from "../models/review.server.js";
+
+function CsvDropArea({ fileName, rowCount, onFileSelected, onClearFile, hint }) {
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  if (fileName) {
+    return (
+      <s-box padding="base" background="subdued" borderRadius="base">
+        <s-stack direction="inline" justifyContent="space-between" alignItems="center">
+          <s-stack direction="inline" gap="small" alignItems="center">
+            <s-badge tone="success">File Loaded</s-badge>
+            <s-text weight="semibold">{fileName}</s-text>
+            <s-text tone="subdued" size="small">({rowCount} review{rowCount === 1 ? "" : "s"} detected)</s-text>
+          </s-stack>
+          <s-button variant="tertiary" tone="critical" onClick={onClearFile}>Remove</s-button>
+        </s-stack>
+      </s-box>
+    );
+  }
+
+  return (
+    <label
+      onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+      onDragLeave={() => setIsDragOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setIsDragOver(false);
+        if (e.dataTransfer.files?.[0]) {
+          onFileSelected(e.dataTransfer.files[0]);
+        }
+      }}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "32px 16px",
+        border: isDragOver ? "2px dashed #005BD3" : "2px dashed #D2D5D8",
+        borderRadius: "8px",
+        backgroundColor: isDragOver ? "#F0F7FF" : "#FAFAFA",
+        cursor: "pointer",
+        transition: "all 0.15s ease",
+        textAlign: "center",
+      }}
+    >
+      <input
+        type="file"
+        accept=".csv,text/csv,text/plain"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          if (e.target.files?.[0]) {
+            onFileSelected(e.target.files[0]);
+          }
+        }}
+      />
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6D7175" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: "8px" }}>
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <polyline points="17 8 12 3 7 8" />
+        <line x1="12" y1="3" x2="12" y2="15" />
+      </svg>
+      <s-text weight="semibold">Drop CSV file to upload</s-text>
+      <s-text tone="subdued" size="small" style={{ marginTop: "4px" }}>
+        {hint || "or click to browse your computer"}
+      </s-text>
+    </label>
+  );
+}
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
@@ -80,6 +133,8 @@ export const action = async ({ request }) => {
     let authorName = "Customer";
     let authorEmail = "customer@example.com";
     let productHandle = "the-complete-snowboard";
+    let verified = false;
+    let explicitlyVerified = false;
 
     headers.forEach((h, idx) => {
       const val = cols[idx] || "";
@@ -111,8 +166,15 @@ export const action = async ({ request }) => {
         h.includes("sku")
       ) {
         productHandle = val;
+      } else if (h.includes("verified")) {
+        verified = val.toLowerCase() === "true" || val === "1" || val.toLowerCase() === "yes";
+        explicitlyVerified = true;
       }
     });
+
+    if (!explicitlyVerified && authorEmail) {
+      verified = await verifyCustomerByEmail(session.shop, authorEmail);
+    }
 
     if (body) {
       await createReview({
@@ -125,7 +187,7 @@ export const action = async ({ request }) => {
         body,
         authorName,
         authorEmail,
-        verified: true,
+        verified,
       });
       importedCount++;
     }
@@ -229,6 +291,7 @@ export default function ImportPage() {
   const navigation = useNavigation();
   const submit = useSubmit();
   const exportFetcher = useFetcher();
+  const navigate = useNavigate();
 
   const isImporting = navigation.state === "submitting";
   const isExporting = exportFetcher.state !== "idle";
@@ -311,11 +374,6 @@ export default function ImportPage() {
     reader.readAsText(file);
   };
 
-  const handleDrop = (_droppedFiles, acceptedFiles) => {
-    if (acceptedFiles && acceptedFiles.length > 0) {
-      processFile(acceptedFiles[0]);
-    }
-  };
 
   const handleClearFile = () => {
     setCsvContent("");
@@ -386,41 +444,39 @@ export default function ImportPage() {
   );
 
   return (
-    <Page>
-      <ui-title-bar title="Import reviews" />
-
+    <s-page heading="Import reviews">
       <div style={{ maxWidth: "1000px", margin: "0 auto" }}>
         {/* Banner feedback */}
         <div style={{ marginBottom: "16px" }}>
           {actionData?.success && (
-            <Banner tone="success" title="Import Complete" onDismiss={() => { }}>
-              <p>
+            <s-banner tone="success" heading="Import Complete">
+              <s-paragraph>
                 Successfully imported <strong>{actionData.count}</strong> reviews!{" "}
-                <Button variant="plain" url="/app/reviews">
+                <s-button variant="tertiary" onClick={() => navigate("/app/reviews")}>
                   View in Moderation Inbox →
-                </Button>
-              </p>
-            </Banner>
+                </s-button>
+              </s-paragraph>
+            </s-banner>
           )}
 
           {actionData?.error && (
-            <Banner tone="critical" title="Import Error" onDismiss={() => { }}>
-              <p>{actionData.error}</p>
-            </Banner>
+            <s-banner tone="critical" heading="Import Error">
+              <s-paragraph>{actionData.error}</s-paragraph>
+            </s-banner>
           )}
 
           {exportFetcher.data?.exportSuccess && (
-            <Banner tone="success" title="Export Ready" onDismiss={() => { }}>
-              <p>
+            <s-banner tone="success" heading="Export Ready">
+              <s-paragraph>
                 Your CSV reviews backup (<strong>{exportFetcher.data.filename}</strong>) has been downloaded successfully.
-              </p>
-            </Banner>
+              </s-paragraph>
+            </s-banner>
           )}
 
           {exportFetcher.data?.exportError && (
-            <Banner tone="critical" title="Export Failed" onDismiss={() => { }}>
-              <p>{exportFetcher.data.exportError}</p>
-            </Banner>
+            <s-banner tone="critical" heading="Export Failed">
+              <s-paragraph>{exportFetcher.data.exportError}</s-paragraph>
+            </s-banner>
           )}
         </div>
 
@@ -428,7 +484,7 @@ export default function ImportPage() {
             VIEW 1: "From review apps" (Judge.me layout with app search & app list)
         ========================================================================== */}
         {currentView === "apps" && (
-          <BlockStack gap="400">
+          <s-stack gap="base">
             {/* Top header with Back arrow button */}
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
               <button
@@ -453,20 +509,16 @@ export default function ImportPage() {
                   <path d="M19 12H5M12 19l-7-7 7-7" />
                 </svg>
               </button>
-              <span style={{ fontSize: "20px", fontWeight: "600", color: "#202223" }}>
-                From review apps
-              </span>
+              <s-heading size="medium">From review apps</s-heading>
             </div>
 
-            <Card padding="500">
-              <BlockStack gap="400">
+            <s-section>
+              <s-stack gap="base">
                 <div>
-                  <h2 style={{ fontSize: "15px", fontWeight: "600", color: "#202223", margin: "0 0 4px 0" }}>
-                    Import reviews from a CSV file
-                  </h2>
-                  <p style={{ fontSize: "13px", color: "#6D7175", margin: 0 }}>
-                    Export reviews from your current reviews app and import them here easily. Need help exporting the reviews?
-                  </p>
+                  <s-heading size="small">Import reviews from a CSV file</s-heading>
+                  <s-text tone="subdued" size="small">
+                    Export reviews from your current reviews app and import them here easily.
+                  </s-text>
                 </div>
 
                 {/* Search app input */}
@@ -610,81 +662,81 @@ export default function ImportPage() {
                               borderTop: "1px solid #E1E3E5",
                             }}
                           >
-                            <BlockStack gap="300">
-                              <Text as="p" variant="bodySm" tone="subdued">
+                            <s-stack gap="base">
+                              <s-text tone="subdued" size="small">
                                 Drop your <strong>{app.name}</strong> reviews export CSV file below.
-                              </Text>
+                              </s-text>
 
-                              <DropZone onDrop={handleDrop} allowMultiple={false} accept=".csv,text/csv,text/plain">
-                                {fileName ? (
-                                  <Box padding="300">
-                                    <InlineStack align="space-between" blockAlign="center">
-                                      <InlineStack gap="200" blockAlign="center">
-                                        <Badge tone="success">File Loaded</Badge>
-                                        <Text as="span" fontWeight="semibold">{fileName}</Text>
-                                        <Text as="span" tone="subdued">({rowCount} review{rowCount === 1 ? "" : "s"} detected)</Text>
-                                      </InlineStack>
-                                      <Button variant="plain" tone="critical" onClick={handleClearFile}>Remove</Button>
-                                    </InlineStack>
-                                  </Box>
-                                ) : (
-                                  <DropZone.FileUpload actionHint={`or click to upload CSV from ${app.name}`} />
-                                )}
-                              </DropZone>
+                              <CsvDropArea
+                                fileName={fileName}
+                                rowCount={rowCount}
+                                onFileSelected={processFile}
+                                onClearFile={handleClearFile}
+                                hint={`or click to upload CSV from ${app.name}`}
+                              />
 
-                              <InlineStack align="space-between" blockAlign="center">
-                                <Button variant="plain" onClick={() => loadSampleData(app)}>
+                              <s-stack direction="inline" justifyContent="space-between" alignItems="center">
+                                <s-button variant="tertiary" onClick={() => loadSampleData(app)}>
                                   Load sample {app.name} CSV
-                                </Button>
-                                <Button variant="plain" onClick={() => setShowRawEditor(!showRawEditor)}>
+                                </s-button>
+                                <s-button variant="tertiary" onClick={() => setShowRawEditor(!showRawEditor)}>
                                   {showRawEditor ? "Hide CSV text" : "View/edit CSV text"}
-                                </Button>
-                              </InlineStack>
+                                </s-button>
+                              </s-stack>
 
                               {showRawEditor && (
-                                <TextField
-                                  label="Raw CSV Data"
-                                  multiline={4}
+                                <textarea
+                                  rows={5}
                                   value={csvContent}
-                                  onChange={(val) => {
+                                  onChange={(e) => {
+                                    const val = e.target.value;
                                     setCsvContent(val);
                                     const rows = val.trim().split("\n").filter(Boolean);
                                     setRowCount(Math.max(0, rows.length - 1));
                                   }}
-                                  autoComplete="off"
+                                  style={{
+                                    width: "100%",
+                                    padding: "8px 12px",
+                                    borderRadius: "6px",
+                                    border: "1px solid #C9CCCF",
+                                    fontFamily: "monospace",
+                                    fontSize: "12px",
+                                    boxSizing: "border-box",
+                                    outline: "none",
+                                  }}
                                 />
                               )}
 
-                              <InlineStack gap="200">
-                                <Button
+                              <s-stack direction="inline" gap="small">
+                                <s-button
                                   variant="primary"
-                                  loading={isImporting}
-                                  disabled={!csvContent.trim()}
+                                  loading={isImporting ? true : undefined}
+                                  disabled={!csvContent.trim() ? true : undefined}
                                   onClick={handleStartImport}
                                 >
                                   Start Import
-                                </Button>
-                                <Button onClick={() => { setSelectedItem(null); handleClearFile(); }}>
+                                </s-button>
+                                <s-button variant="secondary" onClick={() => { setSelectedItem(null); handleClearFile(); }}>
                                   Cancel
-                                </Button>
-                              </InlineStack>
-                            </BlockStack>
+                                </s-button>
+                              </s-stack>
+                            </s-stack>
                           </div>
                         )}
                       </div>
                     );
                   })}
                 </div>
-              </BlockStack>
-            </Card>
-          </BlockStack>
+              </s-stack>
+            </s-section>
+          </s-stack>
         )}
 
         {/* =========================================================================
             VIEW 2: "From a spreadsheet" (Google Sheets / Excel CSV format)
         ========================================================================== */}
         {currentView === "spreadsheet" && (
-          <BlockStack gap="400">
+          <s-stack gap="base">
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
               <button
                 type="button"
@@ -708,86 +760,82 @@ export default function ImportPage() {
                   <path d="M19 12H5M12 19l-7-7 7-7" />
                 </svg>
               </button>
-              <span style={{ fontSize: "20px", fontWeight: "600", color: "#202223" }}>
-                From a spreadsheet
-              </span>
+              <s-heading size="medium">From a spreadsheet</s-heading>
             </div>
 
-            <Card padding="500">
-              <BlockStack gap="400">
+            <s-section>
+              <s-stack gap="base">
                 <div>
-                  <h2 style={{ fontSize: "15px", fontWeight: "600", color: "#202223", margin: "0 0 4px 0" }}>
-                    Import reviews from a spreadsheet
-                  </h2>
-                  <p style={{ fontSize: "13px", color: "#6D7175", margin: 0 }}>
+                  <s-heading size="small">Import reviews from a spreadsheet</s-heading>
+                  <s-text tone="subdued" size="small">
                     Upload any CSV spreadsheet with columns for title, body, rating, reviewer_name, reviewer_email, and product_handle.
-                  </p>
+                  </s-text>
                 </div>
 
-                <InlineStack gap="200">
-                  <Button variant="secondary" onClick={handleDownloadTemplate}>
+                <s-stack direction="inline" gap="small">
+                  <s-button variant="secondary" onClick={handleDownloadTemplate}>
                     Download CSV Template
-                  </Button>
-                  <Button variant="plain" onClick={() => loadSampleData({ id: "spreadsheet" })}>
+                  </s-button>
+                  <s-button variant="tertiary" onClick={() => loadSampleData({ id: "spreadsheet" })}>
                     Load Sample Data
-                  </Button>
-                </InlineStack>
+                  </s-button>
+                </s-stack>
 
-                <DropZone onDrop={handleDrop} allowMultiple={false} accept=".csv,text/csv,text/plain">
-                  {fileName ? (
-                    <Box padding="300">
-                      <InlineStack align="space-between" blockAlign="center">
-                        <InlineStack gap="200" blockAlign="center">
-                          <Badge tone="success">File Loaded</Badge>
-                          <Text as="span" fontWeight="semibold">{fileName}</Text>
-                          <Text as="span" tone="subdued">({rowCount} reviews detected)</Text>
-                        </InlineStack>
-                        <Button variant="plain" tone="critical" onClick={handleClearFile}>Remove</Button>
-                      </InlineStack>
-                    </Box>
-                  ) : (
-                    <DropZone.FileUpload actionHint="or click to browse your CSV spreadsheet" />
-                  )}
-                </DropZone>
+                <CsvDropArea
+                  fileName={fileName}
+                  rowCount={rowCount}
+                  onFileSelected={processFile}
+                  onClearFile={handleClearFile}
+                  hint="or click to browse your CSV spreadsheet"
+                />
 
                 {showRawEditor && (
-                  <TextField
-                    label="Raw CSV Data"
-                    multiline={4}
+                  <textarea
+                    rows={5}
                     value={csvContent}
-                    onChange={(val) => {
+                    onChange={(e) => {
+                      const val = e.target.value;
                       setCsvContent(val);
                       const rows = val.trim().split("\n").filter(Boolean);
                       setRowCount(Math.max(0, rows.length - 1));
                     }}
-                    autoComplete="off"
+                    style={{
+                      width: "100%",
+                      padding: "8px 12px",
+                      borderRadius: "6px",
+                      border: "1px solid #C9CCCF",
+                      fontFamily: "monospace",
+                      fontSize: "12px",
+                      boxSizing: "border-box",
+                      outline: "none",
+                    }}
                   />
                 )}
 
-                <InlineStack align="space-between" blockAlign="center">
-                  <Button variant="plain" onClick={() => setShowRawEditor(!showRawEditor)}>
+                <s-stack direction="inline" justifyContent="space-between" alignItems="center">
+                  <s-button variant="tertiary" onClick={() => setShowRawEditor(!showRawEditor)}>
                     {showRawEditor ? "Hide CSV text" : "View / edit CSV text"}
-                  </Button>
+                  </s-button>
 
-                  <Button
+                  <s-button
                     variant="primary"
-                    loading={isImporting}
-                    disabled={!csvContent.trim()}
+                    loading={isImporting ? true : undefined}
+                    disabled={!csvContent.trim() ? true : undefined}
                     onClick={handleStartImport}
                   >
                     Start Import
-                  </Button>
-                </InlineStack>
-              </BlockStack>
-            </Card>
-          </BlockStack>
+                  </s-button>
+                </s-stack>
+              </s-stack>
+            </s-section>
+          </s-stack>
         )}
 
         {/* =========================================================================
             VIEW 3: "From other platforms" (AliExpress, Amazon, Etsy, etc.)
         ========================================================================== */}
         {currentView === "platforms" && (
-          <BlockStack gap="400">
+          <s-stack gap="base">
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
               <button
                 type="button"
@@ -811,20 +859,16 @@ export default function ImportPage() {
                   <path d="M19 12H5M12 19l-7-7 7-7" />
                 </svg>
               </button>
-              <span style={{ fontSize: "20px", fontWeight: "600", color: "#202223" }}>
-                From other platforms
-              </span>
+              <s-heading size="medium">From other platforms</s-heading>
             </div>
 
-            <Card padding="500">
-              <BlockStack gap="400">
+            <s-section>
+              <s-stack gap="base">
                 <div>
-                  <h2 style={{ fontSize: "15px", fontWeight: "600", color: "#202223", margin: "0 0 4px 0" }}>
-                    Import reviews from marketplaces &amp; platforms
-                  </h2>
-                  <p style={{ fontSize: "13px", color: "#6D7175", margin: 0 }}>
+                  <s-heading size="small">Import reviews from marketplaces &amp; platforms</s-heading>
+                  <s-text tone="subdued" size="small">
                     Select your source platform below to import exported reviews.
-                  </p>
+                  </s-text>
                 </div>
 
                 {/* Platforms List */}
@@ -976,64 +1020,55 @@ export default function ImportPage() {
                               borderTop: "1px solid #E1E3E5",
                             }}
                           >
-                            <BlockStack gap="300">
-                              <Text as="p" variant="bodySm" tone="subdued">
+                            <s-stack gap="base">
+                              <s-text tone="subdued" size="small">
                                 Drop your <strong>{plat.name}</strong> review export CSV file below.
-                              </Text>
+                              </s-text>
 
-                              <DropZone onDrop={handleDrop} allowMultiple={false} accept=".csv,text/csv,text/plain">
-                                {fileName ? (
-                                  <Box padding="300">
-                                    <InlineStack align="space-between" blockAlign="center">
-                                      <InlineStack gap="200" blockAlign="center">
-                                        <Badge tone="success">File Loaded</Badge>
-                                        <Text as="span" fontWeight="semibold">{fileName}</Text>
-                                        <Text as="span" tone="subdued">({rowCount} review{rowCount === 1 ? "" : "s"} detected)</Text>
-                                      </InlineStack>
-                                      <Button variant="plain" tone="critical" onClick={handleClearFile}>Remove</Button>
-                                    </InlineStack>
-                                  </Box>
-                                ) : (
-                                  <DropZone.FileUpload actionHint={`or click to upload CSV from ${plat.name}`} />
-                                )}
-                              </DropZone>
+                              <CsvDropArea
+                                fileName={fileName}
+                                rowCount={rowCount}
+                                onFileSelected={processFile}
+                                onClearFile={handleClearFile}
+                                hint={`or click to upload CSV from ${plat.name}`}
+                              />
 
-                              <InlineStack align="space-between" blockAlign="center">
-                                <Button variant="plain" onClick={() => loadSampleData(plat)}>
+                              <s-stack direction="inline" justifyContent="space-between" alignItems="center">
+                                <s-button variant="tertiary" onClick={() => loadSampleData(plat)}>
                                   Load sample {plat.name} CSV
-                                </Button>
-                              </InlineStack>
+                                </s-button>
+                              </s-stack>
 
-                              <InlineStack gap="200">
-                                <Button
+                              <s-stack direction="inline" gap="small">
+                                <s-button
                                   variant="primary"
-                                  loading={isImporting}
-                                  disabled={!csvContent.trim()}
+                                  loading={isImporting ? true : undefined}
+                                  disabled={!csvContent.trim() ? true : undefined}
                                   onClick={handleStartImport}
                                 >
                                   Start Import
-                                </Button>
-                                <Button onClick={() => { setSelectedItem(null); handleClearFile(); }}>
+                                </s-button>
+                                <s-button variant="secondary" onClick={() => { setSelectedItem(null); handleClearFile(); }}>
                                   Cancel
-                                </Button>
-                              </InlineStack>
-                            </BlockStack>
+                                </s-button>
+                              </s-stack>
+                            </s-stack>
                           </div>
                         )}
                       </div>
                     );
                   })}
                 </div>
-              </BlockStack>
-            </Card>
-          </BlockStack>
+              </s-stack>
+            </s-section>
+          </s-stack>
         )}
 
         {/* =========================================================================
             VIEW 4: "From another store you own that uses Judge.me"
         ========================================================================== */}
         {currentView === "store" && (
-          <BlockStack gap="400">
+          <s-stack gap="base">
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
               <button
                 type="button"
@@ -1057,71 +1092,55 @@ export default function ImportPage() {
                   <path d="M19 12H5M12 19l-7-7 7-7" />
                 </svg>
               </button>
-              <span style={{ fontSize: "20px", fontWeight: "600", color: "#202223" }}>
-                From another store you own that uses Judge.me
-              </span>
+              <s-heading size="medium">From another store you own that uses Judge.me</s-heading>
             </div>
 
-            <Card padding="500">
-              <BlockStack gap="400">
+            <s-section>
+              <s-stack gap="base">
                 <div>
-                  <h2 style={{ fontSize: "15px", fontWeight: "600", color: "#202223", margin: "0 0 4px 0" }}>
-                    Transfer reviews from another Shopify store
-                  </h2>
-                  <p style={{ fontSize: "13px", color: "#6D7175", margin: 0 }}>
+                  <s-heading size="small">Transfer reviews from another Shopify store</s-heading>
+                  <s-text tone="subdued" size="small">
                     Export a CSV backup from your other store using Judge.me or Reviora, and upload it below to sync reviews.
-                  </p>
+                  </s-text>
                 </div>
 
-                <DropZone onDrop={handleDrop} allowMultiple={false} accept=".csv,text/csv,text/plain">
-                  {fileName ? (
-                    <Box padding="300">
-                      <InlineStack align="space-between" blockAlign="center">
-                        <InlineStack gap="200" blockAlign="center">
-                          <Badge tone="success">File Loaded</Badge>
-                          <Text as="span" fontWeight="semibold">{fileName}</Text>
-                          <Text as="span" tone="subdued">({rowCount} reviews detected)</Text>
-                        </InlineStack>
-                        <Button variant="plain" tone="critical" onClick={handleClearFile}>Remove</Button>
-                      </InlineStack>
-                    </Box>
-                  ) : (
-                    <DropZone.FileUpload actionHint="or click to browse your backup CSV" />
-                  )}
-                </DropZone>
+                <CsvDropArea
+                  fileName={fileName}
+                  rowCount={rowCount}
+                  onFileSelected={processFile}
+                  onClearFile={handleClearFile}
+                  hint="or click to browse your backup CSV"
+                />
 
-                <InlineStack align="space-between" blockAlign="center">
-                  <Button variant="plain" onClick={() => loadSampleData({ id: "store" })}>
+                <s-stack direction="inline" justifyContent="space-between" alignItems="center">
+                  <s-button variant="tertiary" onClick={() => loadSampleData({ id: "store" })}>
                     Load sample store backup
-                  </Button>
+                  </s-button>
 
-                  <Button
+                  <s-button
                     variant="primary"
-                    loading={isImporting}
-                    disabled={!csvContent.trim()}
+                    loading={isImporting ? true : undefined}
+                    disabled={!csvContent.trim() ? true : undefined}
                     onClick={handleStartImport}
                   >
                     Start Import
-                  </Button>
-                </InlineStack>
-              </BlockStack>
-            </Card>
-          </BlockStack>
+                  </s-button>
+                </s-stack>
+              </s-stack>
+            </s-section>
+          </s-stack>
         )}
 
         {/* =========================================================================
-            MAIN VIEW: The 4 distinct category blocks (matching screenshot 2)
+            MAIN VIEW: The 4 distinct category blocks
         ========================================================================== */}
         {currentView === null && (
-          <BlockStack gap="400">
+          <s-stack gap="base">
+            <s-section>
+              <s-stack gap="base">
+                <s-heading size="small">Import reviews</s-heading>
 
-            <Card padding="500">
-              <BlockStack gap="400">
-                <Text as="h2" variant="headingMd" fontWeight="semibold">
-                  Import reviews
-                </Text>
-
-                <BlockStack gap="300">
+                <s-stack gap="small">
                   {/* Option 1: From review apps */}
                   <div
                     style={{
@@ -1226,19 +1245,17 @@ export default function ImportPage() {
                       </div>
 
                       <div>
-                        <Text as="h3" variant="headingSm" fontWeight="semibold">
-                          From review apps
-                        </Text>
-                        <Text as="p" variant="bodySm" tone="subdued">
+                        <s-heading size="small">From review apps</s-heading>
+                        <s-text tone="subdued" size="small">
                           Bring your reviews from Loox, Yotpo, Air Reviews, Shopify, Klaviyo, Arereviews and others.
-                        </Text>
+                        </s-text>
                       </div>
                     </div>
 
                     <div style={{ flexShrink: 0 }}>
-                      <Button onClick={() => handleNavigateTo("apps")}>
+                      <s-button onClick={() => handleNavigateTo("apps")}>
                         Import from apps
-                      </Button>
+                      </s-button>
                     </div>
                   </div>
 
@@ -1266,19 +1283,17 @@ export default function ImportPage() {
                       </svg>
 
                       <div>
-                        <Text as="h3" variant="headingSm" fontWeight="semibold">
-                          From a spreadsheet
-                        </Text>
-                        <Text as="p" variant="bodySm" tone="subdued">
+                        <s-heading size="small">From a spreadsheet</s-heading>
+                        <s-text tone="subdued" size="small">
                           Import your own reviews from a spreadsheet format.
-                        </Text>
+                        </s-text>
                       </div>
                     </div>
 
                     <div style={{ flexShrink: 0 }}>
-                      <Button onClick={() => handleNavigateTo("spreadsheet")}>
+                      <s-button onClick={() => handleNavigateTo("spreadsheet")}>
                         Import from a spreadsheet
-                      </Button>
+                      </s-button>
                     </div>
                   </div>
 
@@ -1389,19 +1404,17 @@ export default function ImportPage() {
                       </div>
 
                       <div>
-                        <Text as="h3" variant="headingSm" fontWeight="semibold">
-                          From other platforms
-                        </Text>
-                        <Text as="p" variant="bodySm" tone="subdued">
+                        <s-heading size="small">From other platforms</s-heading>
+                        <s-text tone="subdued" size="small">
                           Import reviews from other e-commerce platforms or sync reviews from your other Shopify stores.
-                        </Text>
+                        </s-text>
                       </div>
                     </div>
 
                     <div style={{ flexShrink: 0 }}>
-                      <Button onClick={() => handleNavigateTo("platforms")}>
+                      <s-button onClick={() => handleNavigateTo("platforms")}>
                         Import from platforms
-                      </Button>
+                      </s-button>
                     </div>
                   </div>
 
@@ -1437,48 +1450,44 @@ export default function ImportPage() {
                       </div>
 
                       <div>
-                        <Text as="h3" variant="headingSm" fontWeight="semibold">
-                          From another store you own that uses Judge.me
-                        </Text>
-                        <Text as="p" variant="bodySm" tone="subdued">
+                        <s-heading size="small">From another store you own that uses Judge.me</s-heading>
+                        <s-text tone="subdued" size="small">
                           Transfer your Judge.me reviews or sync between stores.
-                        </Text>
+                        </s-text>
                       </div>
                     </div>
 
                     <div style={{ flexShrink: 0 }}>
-                      <Button onClick={() => handleNavigateTo("store")}>
+                      <s-button onClick={() => handleNavigateTo("store")}>
                         Import from another store
-                      </Button>
+                      </s-button>
                     </div>
                   </div>
-                </BlockStack>
-              </BlockStack>
-            </Card>
+                </s-stack>
+              </s-stack>
+            </s-section>
 
             {/* Export Reviews Backup Section */}
-            <Card padding="400">
-              <BlockStack gap="300">
-                <InlineStack align="space-between" blockAlign="center">
-                  <BlockStack gap="100">
-                    <Text as="h2" variant="headingSm" fontWeight="semibold">Download Reviews Backup</Text>
-                    <Text as="p" variant="bodySm" tone="subdued">
-                      Download all customer reviews currently stored in your Reviora database as a CSV file.
-                    </Text>
-                  </BlockStack>
-                  <Button
-                    variant="primary"
-                    loading={isExporting}
-                    onClick={handleExport}
-                  >
-                    Export All Reviews (CSV)
-                  </Button>
-                </InlineStack>
-              </BlockStack>
-            </Card>
-          </BlockStack>
+            <s-section>
+              <s-stack direction="inline" justifyContent="space-between" alignItems="center">
+                <s-stack gap="extra-tight">
+                  <s-heading size="small">Download Reviews Backup</s-heading>
+                  <s-text tone="subdued" size="small">
+                    Download all customer reviews currently stored in your Reviora database as a CSV file.
+                  </s-text>
+                </s-stack>
+                <s-button
+                  variant="primary"
+                  loading={isExporting ? true : undefined}
+                  onClick={handleExport}
+                >
+                  Export All Reviews (CSV)
+                </s-button>
+              </s-stack>
+            </s-section>
+          </s-stack>
         )}
       </div>
-    </Page>
+    </s-page>
   );
 }

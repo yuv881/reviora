@@ -1,14 +1,13 @@
-import { InlineStack, Text } from "@shopify/polaris";
 import { Star } from "lucide-react";
 
 /**
- * StarRating component using Polaris InlineStack and Text
+ * StarRating component using App Bridge s-stack and s-text
  */
 export function StarRating({ rating = 5, size = 16, showNumber = false }) {
   const fullStars = Math.max(0, Math.min(5, Math.round(rating)));
 
   return (
-    <InlineStack gap="050" blockAlign="center">
+    <s-stack direction="inline" gap="extra-tight" alignItems="center">
       {[1, 2, 3, 4, 5].map((i) => (
         <Star
           key={i}
@@ -19,10 +18,10 @@ export function StarRating({ rating = 5, size = 16, showNumber = false }) {
         />
       ))}
       {showNumber && (
-        <Text as="span" variant="bodySm" fontWeight="semibold">
+        <s-text size="small" weight="semibold">
           {rating.toFixed(1)}
-        </Text>
+        </s-text>
       )}
-    </InlineStack>
+    </s-stack>
   );
 }

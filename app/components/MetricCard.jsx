@@ -1,40 +1,30 @@
-import { Card, BlockStack, InlineStack, Text, Box } from "@shopify/polaris";
-
 /**
- * Metric KPI Card built using native Shopify Polaris React components
+ * Metric KPI Card built using native App Bridge web components
  */
 export function MetricCard({ label, value, subtext, icon: Icon, tone = "default" }) {
-  const toneMap = {
-    warning: "caution",
-    success: "success",
-    critical: "critical",
-    default: "subdued",
-  };
+  const isSubdued = tone === "default";
 
   return (
-    <Card>
-      <BlockStack gap="200">
-        <InlineStack align="space-between" blockAlign="center">
-          <Text as="span" variant="headingXs" tone="subdued">
-            {label}
-          </Text>
+    <s-section>
+      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        <s-stack direction="inline" justifyContent="space-between" alignItems="center">
+          <s-text color="subdued">{label}</s-text>
           {Icon && (
-            <Box background="bg-surface-secondary" padding="100" borderRadius="100">
+            <s-box padding="extra-tight">
               <Icon size={16} />
-            </Box>
+            </s-box>
           )}
-        </InlineStack>
+        </s-stack>
 
-        <Text as="p" variant="heading2xl" fontWeight="bold">
-          {value}
-        </Text>
+        {/* <s-heading size="large">{value}</s-heading> */}
+        <h1 style={{ fontSize: "24px", fontWeight: "bold" }}>{value}</h1>
 
         {subtext && (
-          <Text as="p" variant="bodySm" tone={toneMap[tone] || "subdued"}>
+          <s-text color={isSubdued ? "subdued" : undefined}>
             {subtext}
-          </Text>
+          </s-text>
         )}
-      </BlockStack>
-    </Card>
+      </div>
+    </s-section>
   );
 }

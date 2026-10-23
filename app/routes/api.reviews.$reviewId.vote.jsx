@@ -4,14 +4,26 @@ import { connectDB } from "../db.server.js";
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept",
+  "Access-Control-Max-Age": "86400",
 };
 
 export const options = () => {
-  return new Response(null, { headers: CORS_HEADERS });
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
+};
+
+export const loader = async ({ request }) => {
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
+  return Response.json({ error: "Method not allowed" }, { status: 405, headers: CORS_HEADERS });
 };
 
 export const action = async ({ params, request }) => {
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
+
   if (request.method !== "POST") {
     return Response.json({ error: "Method not allowed" }, { status: 405, headers: CORS_HEADERS });
   }

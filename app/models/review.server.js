@@ -3,6 +3,65 @@ import { ShopSetting } from "./shopSetting.model.js";
 import { StoreReviews } from "./review.model.js";
 import { ReviewRequest } from "./reviewRequest.model.js";
 import { uploadToCloudinary } from "../utils/cloudinary.server.js";
+import { unauthenticated } from "../shopify.server.js";
+
+/**
+ * Verify whether an authorEmail belongs to an existing customer with orders in Shopify
+ * or has an existing order review request in this shop.
+ */
+export async function verifyCustomerByEmail(shop, email, adminClient = null) {
+  if (!email || !email.trim() || !shop) return false;
+  const cleanEmail = email.trim().toLowerCase();
+
+  try {
+    await connectDB();
+    // 1. Fast check in local ReviewRequest database (fulfilled/delivered orders)
+    const hasRequest = await ReviewRequest.exists({
+      shop,
+      customerEmail: { $regex: new RegExp(`^${cleanEmail}$`, "i") },
+    });
+    if (hasRequest) return true;
+  } catch (err) {
+    console.warn("Could not check ReviewRequest for email verification:", err?.message || err);
+  }
+
+  // 2. Query Shopify orders for this email via Admin GraphQL
+  try {
+    let admin = adminClient;
+    if (!admin) {
+      const auth = await unauthenticated.admin(shop);
+      admin = auth?.admin;
+    }
+
+    if (admin) {
+      const response = await admin.graphql(
+        `#graphql
+        query checkCustomerPurchased($query: String!) {
+          orders(first: 1, query: $query) {
+            nodes {
+              id
+            }
+          }
+        }`,
+        {
+          variables: {
+            query: `email:${cleanEmail}`,
+          },
+        }
+      );
+
+      const json = await response.json();
+      const orders = json.data?.orders?.nodes || [];
+      if (orders.length > 0) {
+        return true;
+      }
+    }
+  } catch (err) {
+    console.warn(`Customer order check for "${cleanEmail}" failed:`, err?.message || err);
+  }
+
+  return false;
+}
 
 /**
  * Fetch or initialize default settings for a given shop
@@ -270,6 +329,12 @@ export async function createReview({
     });
   }
 
+  // Verify if reviewer is an existing customer by email
+  let isVerified = Boolean(verified);
+  if (!isVerified && authorEmail) {
+    isVerified = await verifyCustomerByEmail(shop, authorEmail);
+  }
+
   const newReviewData = {
     productId: String(productId),
     productTitle,
@@ -280,7 +345,7 @@ export async function createReview({
     body,
     authorName,
     authorEmail,
-    verified,
+    verified: isVerified,
     status,
     sentiment,
     riskScore,

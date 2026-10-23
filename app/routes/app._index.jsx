@@ -1,11 +1,9 @@
 import { useLoaderData, Link } from "react-router";
-import { Page, Layout, Card, InlineGrid, BlockStack, InlineStack, Badge, Text, Box, Button } from "@shopify/polaris";
 import { authenticate } from "../shopify.server.js";
 import { getDashboardMetrics } from "../models/review.server.js";
 import { StoreReviews } from "../models/review.model.js";
 import { connectDB } from "../db.server.js";
 import { MetricCard } from "../components/MetricCard.jsx";
-import { RatingBreakdown } from "../components/RatingBreakdown.jsx";
 import { StarRating } from "../components/StarRating.jsx";
 import { Star, MessageSquare, Clock, Send } from "lucide-react";
 
@@ -40,11 +38,10 @@ export default function DashboardPage() {
   const recentReviews = loaderData?.recentReviews || [];
 
   return (
-    <Page>
-      <ui-title-bar title="Dashboard"></ui-title-bar>
-      <BlockStack gap="500">
+    <s-page heading="Dashboard">
+      <s-stack gap="base">
         {/* KPI Cards Grid */}
-        <InlineGrid columns={{ xs: 1, sm: 2, md: 4 }} gap="400">
+        <s-grid gridTemplateColumns="repeat(auto-fit, minmax(220px, 1fr))" gap="base">
           <MetricCard
             label="Overall Rating"
             value={`★ ${metrics.averageRating}`}
@@ -80,114 +77,61 @@ export default function DashboardPage() {
             icon={Send}
             tone="default"
           />
-        </InlineGrid>
+        </s-grid>
 
-        {/* 2-Column Section: Rating Breakdown + Next Steps */}
-        <Layout>
-          <Layout.Section variant="oneHalf">
-            <RatingBreakdown
-              distribution={metrics.distribution}
-              total={metrics.publishedReviews}
-              averageRating={metrics.averageRating}
-            />
-          </Layout.Section>
+        {/* Recent Reviews Activity Section */}
+        <s-section>
+          <s-stack gap="base">
+            <s-stack direction="inline" justifyContent="space-between" alignItems="center">
+              <s-heading>Recent Reviews Activity</s-heading>
+              {recentReviews.length > 0 && (
+                <Link to="/app/reviews" style={{ textDecoration: "none" }}>
+                  <s-button variant="primary">
+                    View all in Moderation Inbox →
+                  </s-button>
+                </Link>
+              )}
+            </s-stack>
 
-          <Layout.Section variant="oneHalf">
-            <Card>
-              <BlockStack gap="400">
-                <Text as="h2" variant="headingMd">Setup &amp; Next Steps</Text>
+            {recentReviews.length === 0 ? (
+              <s-box padding="large">
+                <s-stack gap="extra-tight" alignItems="center">
+                  <s-text color="subdued" type="strong">No reviews collected yet</s-text>
+                  <s-paragraph color="subdued">
+                    Customer reviews will appear here once submitted on your store or imported.
+                  </s-paragraph>
+                </s-stack>
+              </s-box>
+            ) : (
+              <s-stack gap="small">
+                {recentReviews.map((r) => (
+                  <s-box key={r.id} padding="base" background="subdued" border="base" borderRadius="base">
+                    <s-stack gap="extra-tight">
+                      <s-stack direction="inline" justifyContent="space-between" alignItems="center">
+                        <s-stack direction="inline" gap="extra-tight" alignItems="center">
+                          <StarRating rating={r.rating} size={14} />
+                          <s-text type="strong">{r.title || "Customer Review"}</s-text>
+                        </s-stack>
+                        <s-badge tone={r.status === "PUBLISHED" ? "success" : "warning"}>
+                          {r.status}
+                        </s-badge>
+                      </s-stack>
 
-                <BlockStack gap="300">
-                  <InlineStack gap="300" blockAlign="center">
-                    <Badge tone="success">Ready</Badge>
-                    <Text as="span" variant="bodyMd">
-                      Theme App Extension block installed
-                    </Text>
-                  </InlineStack>
+                      <s-paragraph>{r.body}</s-paragraph>
 
-                  <InlineStack gap="300" blockAlign="center">
-                    <Badge tone="info">Config</Badge>
-                    <Link to="/app/widgets" style={{ textDecoration: "none" }}>
-                      <Button variant="plain">
-                        Manage &amp; Customize Storefront Widgets →
-                      </Button>
-                    </Link>
-                  </InlineStack>
-
-                  <InlineStack gap="300" blockAlign="center">
-                    <Badge tone="info">Import</Badge>
-                    <Link to="/app/import" style={{ textDecoration: "none" }}>
-                      <Button variant="plain">
-                        Import Existing Reviews from Judge.me / CSV →
-                      </Button>
-                    </Link>
-                  </InlineStack>
-                </BlockStack>
-              </BlockStack>
-            </Card>
-          </Layout.Section>
-
-          {/* Recent Reviews Activity Section */}
-          <Layout.Section>
-            <Card>
-              <BlockStack gap="400">
-                <InlineStack align="space-between" blockAlign="center">
-                  <Text as="h2" variant="headingMd">Recent Reviews Activity</Text>
-                  {recentReviews.length > 0 && (
-                    <Link to="/app/reviews" style={{ textDecoration: "none" }}>
-                      <Button variant="plain">
-                        View all in Moderation Inbox →
-                      </Button>
-                    </Link>
-                  )}
-                </InlineStack>
-
-                {recentReviews.length === 0 ? (
-                  <Box padding="600">
-                    <BlockStack gap="200" inlineAlign="center">
-                      <Text as="p" variant="headingSm" tone="subdued">
-                        No reviews collected yet
-                      </Text>
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        Customer reviews will appear here once submitted on your store or imported.
-                      </Text>
-                    </BlockStack>
-                  </Box>
-                ) : (
-                  <BlockStack gap="300">
-                    {recentReviews.map((r) => (
-                      <Box key={r.id} background="bg-surface-secondary" padding="300" borderRadius="200">
-                        <BlockStack gap="200">
-                          <InlineStack align="space-between" blockAlign="center">
-                            <InlineStack gap="200" blockAlign="center">
-                              <StarRating rating={r.rating} size={14} />
-                              <Text as="span" variant="bodyMd" fontWeight="semibold">
-                                {r.title || "Customer Review"}
-                              </Text>
-                            </InlineStack>
-                            <Badge tone={r.status === "PUBLISHED" ? "success" : "warning"}>
-                              {r.status}
-                            </Badge>
-                          </InlineStack>
-
-                          <Text as="p" variant="bodyMd">{r.body}</Text>
-
-                          <Text as="p" variant="bodySm" tone="subdued">
-                            By <Text as="span" fontWeight="medium">{r.authorName}</Text> on{" "}
-                            {new Date(r.createdAt).toLocaleDateString()}
-                            {r.verified && " • Verified Buyer"}
-                          </Text>
-                        </BlockStack>
-                      </Box>
-                    ))}
-                  </BlockStack>
-                )}
-              </BlockStack>
-            </Card>
-          </Layout.Section>
-        </Layout>
-      </BlockStack>
-    </Page>
+                      <s-text color="subdued">
+                        By {r.authorName} on {new Date(r.createdAt).toLocaleDateString()}
+                        {Boolean(r.verified && r.authorEmail) && " • Verified Buyer"}
+                      </s-text>
+                    </s-stack>
+                  </s-box>
+                ))}
+              </s-stack>
+            )}
+          </s-stack>
+        </s-section>
+      </s-stack>
+    </s-page>
   );
 }
 

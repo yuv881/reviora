@@ -3,20 +3,25 @@ import { getStorefrontReviews, createReview, deleteReview } from "../models/revi
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept",
+  "Access-Control-Max-Age": "86400",
 };
 
 /**
  * Handle preflight OPTIONS requests for storefront widgets
  */
 export const options = () => {
-  return new Response(null, { headers: CORS_HEADERS });
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
 };
 
 /**
  * GET /api/reviews?shop=...&productId=...&sort=...&rating=...
  */
 export const loader = async ({ request }) => {
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
+
   const url = new URL(request.url);
   const shop = url.searchParams.get("shop");
   const productId = url.searchParams.get("productId");
@@ -44,6 +49,10 @@ export const loader = async ({ request }) => {
  * DELETE /api/reviews - Review deletion
  */
 export const action = async ({ request }) => {
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
+
   if (request.method === "DELETE") {
     try {
       const payload = await request.json();
@@ -80,7 +89,6 @@ export const action = async ({ request }) => {
       authorName,
       authorEmail,
       mediaUrls: mediaUrls || [],
-      verified: false,
     });
 
     return Response.json({ success: true, review }, { status: 201, headers: CORS_HEADERS });

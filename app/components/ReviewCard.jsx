@@ -1,21 +1,8 @@
 import { useState } from "react";
-import {
-  Card,
-  BlockStack,
-  InlineStack,
-  Badge,
-  Text,
-  ButtonGroup,
-  Button,
-  Divider,
-  Box,
-  Thumbnail,
-  Modal,
-} from "@shopify/polaris";
 import { StarRating } from "./StarRating.jsx";
 
 /**
- * ReviewCard using native Shopify Polaris React components
+ * ReviewCard using native App Bridge web components
  */
 export function ReviewCard({ review, onApprove, onReject, onReply, onDelete, isLoading, loadingIntent }) {
   const [previewImage, setPreviewImage] = useState(null);
@@ -30,48 +17,68 @@ export function ReviewCard({ review, onApprove, onReject, onReply, onDelete, isL
   if (review.sentiment === "POSITIVE") sentimentTone = "success";
   if (review.sentiment === "NEGATIVE") sentimentTone = "critical";
 
+  const modalId = `photo-modal-${review.id || "preview"}`;
+
+  const openLightbox = (url) => {
+    setPreviewImage(url);
+    if (window.shopify?.modal) {
+      window.shopify.modal.show(modalId);
+    } else {
+      document.getElementById(modalId)?.showOverlay();
+    }
+  };
+
+  const closeLightbox = () => {
+    if (window.shopify?.modal) {
+      window.shopify.modal.hide(modalId);
+    } else {
+      document.getElementById(modalId)?.hideOverlay();
+    }
+    setPreviewImage(null);
+  };
+
   return (
     <>
-      <Card>
-        <BlockStack gap="300">
+      <s-section>
+        <s-stack gap="base">
           {/* Top Header Row */}
-          <InlineStack align="space-between" blockAlign="center">
-            <InlineStack gap="200" blockAlign="center">
+          <s-stack direction="inline" justifyContent="space-between" alignItems="center">
+            <s-stack direction="inline" gap="small" alignItems="center">
               <StarRating rating={review.rating} size={15} />
-              <Text as="h3" variant="headingSm" fontWeight="semibold">
-                {review.title || "Customer Review"}
-              </Text>
-              {review.verified && <Badge tone="success">Verified Buyer</Badge>}
-            </InlineStack>
-
-            <InlineStack gap="150" blockAlign="center">
-              <Badge tone={statusTone}>{review.status}</Badge>
-              {review.sentiment && (
-                <Badge tone={sentimentTone}>{review.sentiment}</Badge>
+              <s-heading>{review.title || "Customer Review"}</s-heading>
+              {Boolean(review.verified && review.authorEmail) && (
+                <s-badge tone="success">Verified Buyer</s-badge>
               )}
-            </InlineStack>
-          </InlineStack>
+            </s-stack>
+
+            <s-stack direction="inline" gap="small" alignItems="center">
+              <s-badge tone={statusTone}>{review.status}</s-badge>
+              {review.sentiment && (
+                <s-badge tone={sentimentTone}>{review.sentiment}</s-badge>
+              )}
+            </s-stack>
+          </s-stack>
 
           {/* Author and Product details */}
-          <Text as="p" variant="bodySm" tone="subdued">
-            By <Text as="span" fontWeight="semibold">{review.authorName}</Text> ({review.authorEmail})
+          <s-text color="subdued">
+            By <s-text type="strong">{review.authorName}</s-text> ({review.authorEmail})
             {review.productTitle && ` • on ${review.productTitle}`}
             {` • ${new Date(review.createdAt).toLocaleDateString()}`}
-          </Text>
+          </s-text>
 
           {/* Review Body */}
-          <Text as="p" variant="bodyMd">
+          <s-paragraph>
             {review.body}
-          </Text>
+          </s-paragraph>
 
           {/* Attached Media */}
           {review.media && review.media.length > 0 && (
-            <InlineStack gap="200">
+            <s-stack direction="inline" gap="small">
               {review.media.map((m) => (
                 <button
                   key={m.id || m.url}
                   type="button"
-                  onClick={() => setPreviewImage(m.url)}
+                  onClick={() => openLightbox(m.url)}
                   title="Click to view full photo"
                   aria-label="Click to enlarge customer photo"
                   style={{
@@ -83,118 +90,93 @@ export function ReviewCard({ review, onApprove, onReject, onReply, onDelete, isL
                     display: "inline-flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    transition: "transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = "scale(1.06)";
-                    e.currentTarget.style.borderColor = "#008060";
-                    e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.12)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "scale(1)";
-                    e.currentTarget.style.borderColor = "#E1E3E5";
-                    e.currentTarget.style.boxShadow = "none";
                   }}
                 >
-                  <Thumbnail
-                    source={m.url}
-                    size="medium"
+                  <s-thumbnail
+                    src={m.url}
+                    size="small"
                     alt="Customer upload"
-                  />
+                  ></s-thumbnail>
                 </button>
               ))}
-            </InlineStack>
+            </s-stack>
           )}
 
           {/* Topics */}
           {topics.length > 0 && (
-            <InlineStack gap="100">
+            <s-stack direction="inline" gap="extra-tight">
               {topics.map((t, idx) => (
-                <Badge key={idx} tone="info">
+                <s-badge key={idx} tone="info">
                   {`#${t}`}
-                </Badge>
+                </s-badge>
               ))}
-            </InlineStack>
+            </s-stack>
           )}
 
           {/* Merchant Reply Section */}
           {review.replies && review.replies.length > 0 && (
-            <Box background="bg-surface-secondary" padding="300" borderRadius="200">
-              <BlockStack gap="100">
-                <Text as="p" variant="bodySm" fontWeight="bold" tone="success">
-                  Store Owner Response:
-                </Text>
-                <Text as="p" variant="bodySm">
-                  {review.replies[0].body}
-                </Text>
-              </BlockStack>
-            </Box>
+            <s-box padding="base" background="subdued" border="base" borderRadius="base">
+              <s-stack gap="extra-tight">
+                <s-text type="strong">Store Owner Response:</s-text>
+                <s-paragraph>{review.replies[0].body}</s-paragraph>
+              </s-stack>
+            </s-box>
           )}
 
           {/* Actions Row */}
-          <Divider />
-          <InlineStack align="space-between" blockAlign="center">
-            <ButtonGroup>
+          <s-divider></s-divider>
+          <s-stack direction="inline" justifyContent="space-between" alignItems="center">
+            <s-button-group gap="small">
               {review.status !== "PUBLISHED" && (
-                <Button
+                <s-button
                   variant="primary"
                   disabled={isLoading}
                   loading={isLoading && loadingIntent === "publish"}
                   onClick={() => onApprove(review.id)}
                 >
                   Approve &amp; Publish
-                </Button>
+                </s-button>
               )}
 
               {review.status !== "REJECTED" && (
-                <Button
+                <s-button
+                  variant="secondary"
                   tone="critical"
                   disabled={isLoading}
                   loading={isLoading && loadingIntent === "reject"}
                   onClick={() => onReject(review.id)}
                 >
                   Reject
-                </Button>
+                </s-button>
               )}
 
-              <Button
+              <s-button
                 variant="secondary"
                 onClick={() => onReply(review)}
               >
                 Reply to Customer
-              </Button>
-            </ButtonGroup>
+              </s-button>
+            </s-button-group>
 
             {onDelete && (
-              <Button
-                variant="plain"
+              <s-button
+                variant="primary"
                 tone="critical"
                 onClick={() => onDelete(review)}
               >
                 Delete
-              </Button>
+              </s-button>
             )}
-          </InlineStack>
-        </BlockStack>
-      </Card>
+          </s-stack>
+        </s-stack>
+      </s-section>
 
       {/* Customer Photo Lightbox Modal */}
-      <Modal
-        open={Boolean(previewImage)}
-        onClose={() => setPreviewImage(null)}
-        title="Customer Photo"
-        secondaryActions={[
-          {
-            content: "Open original in new tab",
-            onAction: () => window.open(previewImage, "_blank", "noopener,noreferrer"),
-          },
-          {
-            content: "Close",
-            onAction: () => setPreviewImage(null),
-          },
-        ]}
+      <s-modal
+        id={modalId}
+        heading="Customer Photo"
       >
-        <Modal.Section>
+        <s-box padding="base">
           <div
             style={{
               display: "flex",
@@ -205,20 +187,30 @@ export function ReviewCard({ review, onApprove, onReject, onReply, onDelete, isL
               padding: "16px",
             }}
           >
-            <img
-              src={previewImage}
-              alt="Customer review attachment"
-              style={{
-                maxWidth: "100%",
-                maxHeight: "65vh",
-                borderRadius: "6px",
-                objectFit: "contain",
-                boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
-              }}
-            />
+            {previewImage && (
+              <img
+                src={previewImage}
+                alt="Customer review attachment"
+                style={{
+                  maxWidth: "100%",
+                  maxHeight: "65vh",
+                  borderRadius: "6px",
+                  objectFit: "contain",
+                  boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+                }}
+              />
+            )}
           </div>
-        </Modal.Section>
-      </Modal>
+        </s-box>
+        <s-button
+          slot="secondary-actions"
+          commandFor={modalId}
+          command="--hide"
+          onClick={closeLightbox}
+        >
+          Close
+        </s-button>
+      </s-modal>
     </>
   );
 }

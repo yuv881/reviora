@@ -124,7 +124,7 @@
             <div>
               <span class="reviora-stars">${this.renderStars(r.rating)}</span>
               <span class="reviora-author">${r.authorName}</span>
-              ${r.verified ? '<span class="reviora-badge">✓ Verified Buyer</span>' : ""}
+              ${r.verified && r.authorEmail ? '<span class="reviora-badge">✓ Verified Buyer</span>' : ""}
             </div>
             <div class="reviora-date">${new Date(r.createdAt).toLocaleDateString()}</div>
           </div>

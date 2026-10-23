@@ -1,19 +1,6 @@
 import { useState, useMemo } from "react";
 import { useLoaderData } from "react-router";
-import {
-  Page,
-  Card,
-  BlockStack,
-  InlineStack,
-  InlineGrid,
-  Badge,
-  Button,
-  Text,
-  Box,
-  Select,
-  Modal,
-  Divider,
-} from "@shopify/polaris";
+
 import { authenticate } from "../shopify.server.js";
 import { widgetsConfig } from "../config/widgets.config.jsx";
 import { CheckCircle2 } from "lucide-react";
@@ -98,42 +85,44 @@ export default function WidgetsPage() {
   };
 
   return (
-    <Page>
-      <ui-title-bar title="Widgets" />
-      <BlockStack gap="500">
+    <s-page heading="Widgets">
+      <s-stack gap="base">
         {/* Top Control Bar: Real-time Theme Selector */}
-        <Card>
-          <InlineStack align="space-between" blockAlign="center" wrap gap="400">
-            <BlockStack gap="100">
-              <Text as="h2" variant="headingMd">
-                Storefront Widgets
-              </Text>
-              <Text as="p" variant="bodySm" tone="subdued">
+        <s-section>
+          <s-stack direction="inline" justifyContent="space-between" alignItems="center" wrap="wrap" gap="base">
+            <s-stack gap="extra-tight">
+              <s-heading size="small">Storefront Widgets</s-heading>
+              <s-text tone="subdued" size="small">
                 Manage, install, and customize review widgets across your store themes.
-              </Text>
-            </BlockStack>
+              </s-text>
+            </s-stack>
 
-            <Box minWidth="260px">
-              <Select
+            <div style={{ minWidth: "260px" }}>
+              <s-select
                 label="Select Theme to Customize"
-                options={themeOptions}
                 value={selectedThemeId}
-                onChange={setSelectedThemeId}
-              />
-            </Box>
-          </InlineStack>
-        </Card>
+                onChange={(e) => setSelectedThemeId(e.target.value)}
+              >
+                {themeOptions.map((opt) => (
+                  <s-option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </s-option>
+                ))}
+              </s-select>
+            </div>
+          </s-stack>
+        </s-section>
 
         {/* Dynamic Widgets Grid from config/widgets.config.jsx */}
-        <InlineGrid columns={{ xs: 1, sm: 2, md: 3 }} gap="400">
+        <s-grid gridTemplateColumns="repeat(auto-fit, minmax(280px, 1fr))" gap="base">
           {widgetsConfig.map((widget) => {
             const editorUrl = getThemeEditorUrl(widget.template || "product");
             const snippetCode =
               typeof widget.snippet === "function" ? widget.snippet(shop) : widget.snippet || "";
 
             return (
-              <Card key={widget.id} padding="0">
-                <BlockStack>
+              <s-section key={widget.id}>
+                <s-stack gap="base">
                   {/* Top Graphic Header */}
                   <div
                     style={{
@@ -144,8 +133,7 @@ export default function WidgetsPage() {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      borderTopLeftRadius: "var(--p-border-radius-300, 12px)",
-                      borderTopRightRadius: "var(--p-border-radius-300, 12px)",
+                      borderRadius: "8px",
                       padding: "12px",
                       boxSizing: "border-box",
                       position: "relative",
@@ -155,7 +143,6 @@ export default function WidgetsPage() {
                     {widget.preview?.render ? (
                       widget.preview.render()
                     ) : (
-                      /* Default Fallback Preview if no custom render was provided */
                       <div
                         style={{
                           width: "86%",
@@ -180,146 +167,134 @@ export default function WidgetsPage() {
                   </div>
 
                   {/* Card Body */}
-                  <Box padding="400">
-                    <BlockStack gap="300">
-                      {/* Title + Badge */}
-                      <InlineStack align="space-between" blockAlign="center">
-                        <Text as="h2" variant="headingMd">
-                          {widget.title}
-                        </Text>
-                        {widget.badge && (
-                          <Badge tone={widget.badgeTone || "success"}>{widget.badge}</Badge>
-                        )}
-                      </InlineStack>
+                  <s-stack gap="small">
+                    <s-stack direction="inline" justifyContent="space-between" alignItems="center">
+                      <s-heading size="small">{widget.title}</s-heading>
+                      {widget.badge && (
+                        <s-badge tone={widget.badgeTone || "success"}>{widget.badge}</s-badge>
+                      )}
+                    </s-stack>
 
-                      {/* Description */}
-                      <div style={{ minHeight: "44px" }}>
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          {widget.description}
-                        </Text>
-                      </div>
+                    <div style={{ minHeight: "44px" }}>
+                      <s-text tone="subdued" size="small">
+                        {widget.description}
+                      </s-text>
+                    </div>
 
-                      {/* Action Buttons */}
-                      <InlineStack gap="200" blockAlign="center">
-                        {widget.hasInstall && (
-                          <Button size="slim" url={editorUrl} external>
-                            Install ↗
-                          </Button>
-                        )}
-
-                        <Button
+                    <s-stack direction="inline" gap="small" alignItems="center">
+                      {widget.hasInstall && (
+                        <s-button
                           size="slim"
-                          variant="secondary"
-                          onClick={() =>
-                            setSelectedWidget({
-                              ...widget,
-                              editorUrl,
-                              snippetCode,
-                            })
-                          }
+                          onClick={() => window.open(editorUrl, "_blank", "noopener,noreferrer")}
                         >
-                          Customize
-                        </Button>
-                      </InlineStack>
-                    </BlockStack>
-                  </Box>
-                </BlockStack>
-              </Card>
+                          Install ↗
+                        </s-button>
+                      )}
+
+                      <s-button
+                        size="slim"
+                        variant="secondary"
+                        onClick={() =>
+                          setSelectedWidget({
+                            ...widget,
+                            editorUrl,
+                            snippetCode,
+                          })
+                        }
+                      >
+                        Customize
+                      </s-button>
+                    </s-stack>
+                  </s-stack>
+                </s-stack>
+              </s-section>
             );
           })}
-        </InlineGrid>
-      </BlockStack>
+        </s-grid>
+      </s-stack>
 
       {/* Customize & Setup Modal */}
       {selectedWidget && (
-        <Modal
-          open={Boolean(selectedWidget)}
+        <s-modal
+          id="widget-customize-modal"
+          heading={`Customize ${selectedWidget.title}`}
+          open
           onClose={() => setSelectedWidget(null)}
-          title={`Customize ${selectedWidget.title}`}
-          primaryAction={{
-            content: "Open in Theme Editor",
-            url: selectedWidget.editorUrl,
-            external: true,
-          }}
-          secondaryActions={[
-            {
-              content: "Done",
-              onAction: () => setSelectedWidget(null),
-            },
-          ]}
         >
-          <Modal.Section>
-            <BlockStack gap="400">
-              <Text as="p" variant="bodyMd">
-                {selectedWidget.description}
-              </Text>
+          <s-stack gap="base">
+            <s-paragraph>{selectedWidget.description}</s-paragraph>
 
-              <Box padding="300" background="bg-surface-secondary" borderRadius="200">
-                <BlockStack gap="100">
-                  <Text as="p" variant="bodySm" fontWeight="semibold">
-                    Shopify Theme Block Name:
-                  </Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    {selectedWidget.blockName}
-                  </Text>
-                </BlockStack>
-              </Box>
+            <s-box padding="base" background="subdued" borderRadius="base">
+              <s-stack gap="extra-tight">
+                <s-text size="small" weight="semibold">
+                  Shopify Theme Block Name:
+                </s-text>
+                <s-text size="small" tone="subdued">
+                  {selectedWidget.blockName}
+                </s-text>
+              </s-stack>
+            </s-box>
 
-              <Divider />
+            <s-divider></s-divider>
 
-              <BlockStack gap="200">
-                <Text as="h3" variant="headingSm">
-                  How to add to your theme:
-                </Text>
-                <InlineStack gap="200" blockAlign="center">
-                  <CheckCircle2 size={16} color="#059669" />
-                  <Text as="p" variant="bodySm">
-                    1. Click <strong>Open in Theme Editor</strong> below.
-                  </Text>
-                </InlineStack>
-                <InlineStack gap="200" blockAlign="center">
-                  <CheckCircle2 size={16} color="#059669" />
-                  <Text as="p" variant="bodySm">
-                    2. In the template sections panel, click <strong>Add block</strong> or <strong>Add section</strong>.
-                  </Text>
-                </InlineStack>
-                <InlineStack gap="200" blockAlign="center">
-                  <CheckCircle2 size={16} color="#059669" />
-                  <Text as="p" variant="bodySm">
-                    3. Select <strong>{selectedWidget.blockName}</strong>, position it, and click <strong>Save</strong>.
-                  </Text>
-                </InlineStack>
-              </BlockStack>
+            <s-stack gap="small">
+              <s-heading size="small">How to add to your theme:</s-heading>
+              <s-stack direction="inline" gap="small" alignItems="center">
+                <CheckCircle2 size={16} color="#059669" />
+                <s-text size="small">
+                  1. Click <strong>Open in Theme Editor</strong> below.
+                </s-text>
+              </s-stack>
+              <s-stack direction="inline" gap="small" alignItems="center">
+                <CheckCircle2 size={16} color="#059669" />
+                <s-text size="small">
+                  2. In the template sections panel, click <strong>Add block</strong> or <strong>Add section</strong>.
+                </s-text>
+              </s-stack>
+              <s-stack direction="inline" gap="small" alignItems="center">
+                <CheckCircle2 size={16} color="#059669" />
+                <s-text size="small">
+                  3. Select <strong>{selectedWidget.blockName}</strong>, position it, and click <strong>Save</strong>.
+                </s-text>
+              </s-stack>
+            </s-stack>
 
-              <Divider />
+            <s-divider></s-divider>
 
-              <BlockStack gap="200">
-                <InlineStack align="space-between" blockAlign="center">
-                  <Text as="p" variant="bodySm" fontWeight="semibold">
-                    Liquid / HTML Snippet:
-                  </Text>
-                  <Button
-                    size="slim"
-                    variant="plain"
-                    onClick={() => handleCopySnippet(selectedWidget.snippetCode)}
-                  >
-                    {copiedSnippet ? "Copied!" : "Copy Snippet"}
-                  </Button>
-                </InlineStack>
-                <Box
-                  padding="300"
-                  background="bg-surface-secondary"
-                  borderRadius="200"
+            <s-stack gap="small">
+              <s-stack direction="inline" justifyContent="space-between" alignItems="center">
+                <s-text size="small" weight="semibold">Liquid / HTML Snippet:</s-text>
+                <s-button
+                  variant="tertiary"
+                  onClick={() => handleCopySnippet(selectedWidget.snippetCode)}
                 >
-                  <pre style={{ margin: 0, fontSize: "11px", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
-                    {selectedWidget.snippetCode}
-                  </pre>
-                </Box>
-              </BlockStack>
-            </BlockStack>
-          </Modal.Section>
-        </Modal>
+                  {copiedSnippet ? "Copied!" : "Copy Snippet"}
+                </s-button>
+              </s-stack>
+              <s-box padding="base" background="subdued" borderRadius="base">
+                <pre style={{ margin: 0, fontSize: "11px", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                  {selectedWidget.snippetCode}
+                </pre>
+              </s-box>
+            </s-stack>
+          </s-stack>
+
+          <s-button
+            slot="primary-action"
+            variant="primary"
+            onClick={() => window.open(selectedWidget.editorUrl, "_blank", "noopener,noreferrer")}
+          >
+            Open in Theme Editor
+          </s-button>
+          <s-button
+            slot="secondary-actions"
+            variant="secondary"
+            onClick={() => setSelectedWidget(null)}
+          >
+            Done
+          </s-button>
+        </s-modal>
       )}
-    </Page>
+    </s-page>
   );
 }

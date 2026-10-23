@@ -1,20 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useLoaderData, useFetcher, useSubmit, useNavigation } from "react-router";
-import {
-  Page,
-  Card,
-  BlockStack,
-  InlineStack,
-  InlineGrid,
-  TextField,
-  Select,
-  Button,
-  Banner,
-  Badge,
-  Divider,
-  Text,
-  Box,
-} from "@shopify/polaris";
+
 import { authenticate } from "../shopify.server.js";
 import { ReviewRequest } from "../models/reviewRequest.model.js";
 import { connectDB } from "../db.server.js";
@@ -230,174 +216,163 @@ export default function RequestsPage() {
     );
   };
 
-  const orderSelectOptions =
-    orders.length === 0
-      ? [
-        {
-          label: searchQuery
-            ? `No delivered orders matching "${searchQuery}"`
-            : "No delivered orders found yet",
-          value: "",
-          disabled: true,
-        },
-      ]
-      : [
-        { label: "Please select an order", value: "" },
-        ...orders.map((o) => ({
-          label: `${o.orderNumber} — ${o.customerName} (${o.customerEmail || "No email"}) • [${o.fulfillmentStatus}]`,
-          value: o.id,
-        })),
-      ];
-
-  const productOptions =
-    currentOrder && currentOrder.items?.length > 0
-      ? currentOrder.items.map((item, idx) => ({
-        label: item.title,
-        value: idx.toString(),
-      }))
-      : [];
-
   return (
-    <Page>
-      <ui-title-bar title="Review Requests" />
-      <BlockStack gap="500">
+    <s-page heading="Review Requests">
+      <s-stack gap="base">
         {/* Banner Feedback */}
         {fetcher.data?.message && (
-          <Banner tone="success" title="Success" onDismiss={() => { }}>
-            <p>{fetcher.data.message}</p>
-          </Banner>
+          <s-banner tone="success" heading="Success">
+            <s-paragraph>{fetcher.data.message}</s-paragraph>
+          </s-banner>
         )}
 
         {(fetcher.data?.warning || fetcher.data?.error) && (
-          <Banner tone="critical" title="Delivery Notice" onDismiss={() => { }}>
-            <p>{fetcher.data.warning || fetcher.data.error}</p>
-          </Banner>
+          <s-banner tone="critical" heading="Delivery Notice">
+            <s-paragraph>{fetcher.data.warning || fetcher.data.error}</s-paragraph>
+          </s-banner>
         )}
 
         {/* Section 1: Send Invitation by Order */}
-        <Card>
-          <BlockStack gap="400">
-            <BlockStack gap="100">
-              <Text as="h2" variant="headingMd">Send Review Invitation by Order</Text>
-              <Text as="p" variant="bodySm" tone="subdued">
+        <s-section>
+          <s-stack gap="base">
+            <s-stack gap="extra-tight">
+              <s-heading size="small">Send Review Invitation by Order</s-heading>
+              <s-text tone="subdued" size="small">
                 Select or search delivered and fulfilled orders from your store to automatically populate customer and product details.
-              </Text>
-            </BlockStack>
+              </s-text>
+            </s-stack>
 
             {/* Order Search Bar */}
-            <InlineGrid columns={{ xs: 1, md: "1fr auto auto" }} gap="300" alignItems="end">
-              <TextField
+            <s-grid gridTemplateColumns="1fr auto auto" gap="small" alignItems="end">
+              <s-text-field
                 label="Search Delivered Orders"
                 value={searchInput}
-                onChange={setSearchInput}
+                onInput={(e) => setSearchInput(e.target.value)}
                 placeholder="Search order #, customer name, or email..."
-                autoComplete="off"
               />
-              <Button variant="secondary" onClick={handleSearchSubmit} loading={isSearching}>
+              <s-button variant="secondary" onClick={handleSearchSubmit} loading={isSearching ? true : undefined}>
                 Search
-              </Button>
+              </s-button>
               {searchQuery && (
-                <Button variant="plain" onClick={handleClearSearch} disabled={isSearching}>
+                <s-button variant="tertiary" onClick={handleClearSearch} disabled={isSearching ? true : undefined}>
                   Clear ({searchQuery})
-                </Button>
+                </s-button>
               )}
-            </InlineGrid>
+            </s-grid>
 
-            <Divider />
+            <s-divider></s-divider>
 
             {/* Review Invitation Form */}
-            <BlockStack gap="400">
-              <Select
+            <s-stack gap="base">
+              <s-select
                 label="Select Delivered Order"
-                options={orderSelectOptions}
                 value={selectedOrderId}
-                onChange={setSelectedOrderId}
-                disabled={orders.length === 0}
-              />
+                onChange={(e) => setSelectedOrderId(e.target.value)}
+                disabled={orders.length === 0 ? true : undefined}
+              >
+                {orders.length === 0 ? (
+                  <s-option value="" disabled>
+                    {searchQuery
+                      ? `No delivered orders matching "${searchQuery}"`
+                      : "No delivered orders found yet"}
+                  </s-option>
+                ) : (
+                  <>
+                    <s-option value="">Please select an order</s-option>
+                    {orders.map((o) => (
+                      <s-option key={o.id} value={o.id}>
+                        {`${o.orderNumber} — ${o.customerName} (${o.customerEmail || "No email"}) • [${o.fulfillmentStatus}]`}
+                      </s-option>
+                    ))}
+                  </>
+                )}
+              </s-select>
 
-              <InlineGrid columns={{ xs: 1, md: 3 }} gap="300">
-                <TextField
+              <s-grid gridTemplateColumns="repeat(auto-fit, minmax(200px, 1fr))" gap="small">
+                <s-text-field
                   label="Customer Name"
                   value={customerName}
-                  onChange={setCustomerName}
-                  autoComplete="name"
-                  disabled={!currentOrder}
+                  onInput={(e) => setCustomerName(e.target.value)}
+                  disabled={!currentOrder ? true : undefined}
                 />
 
-                <TextField
+                <s-text-field
                   label="Customer Email"
                   type="email"
                   value={customerEmail}
-                  onChange={setCustomerEmail}
-                  autoComplete="email"
-                  disabled={!currentOrder}
+                  onInput={(e) => setCustomerEmail(e.target.value)}
+                  disabled={!currentOrder ? true : undefined}
                 />
 
                 {currentOrder && currentOrder.items && currentOrder.items.length > 0 ? (
-                  <Select
+                  <s-select
                     label="Purchased Product"
-                    options={productOptions}
                     value={selectedProductIndex.toString()}
-                    onChange={(val) => setSelectedProductIndex(Number(val))}
-                  />
+                    onChange={(e) => setSelectedProductIndex(Number(e.target.value))}
+                  >
+                    {currentOrder.items.map((item, idx) => (
+                      <s-option key={item.id || idx} value={idx.toString()}>
+                        {item.title}
+                      </s-option>
+                    ))}
+                  </s-select>
                 ) : (
-                  <TextField
+                  <s-text-field
                     label="Purchased Product"
                     value=""
                     disabled
                     placeholder="No product selected"
-                    autoComplete="off"
                   />
                 )}
-              </InlineGrid>
+              </s-grid>
 
-              <InlineStack>
-                <Button
+              <div>
+                <s-button
                   variant="primary"
-                  loading={isSending}
-                  disabled={!currentOrder || !currentProduct || !customerEmail.trim()}
+                  loading={isSending ? true : undefined}
+                  disabled={!currentOrder || !currentProduct || !customerEmail.trim() ? true : undefined}
                   onClick={handleSend}
                 >
                   Send Review Invitation
-                </Button>
-              </InlineStack>
-            </BlockStack>
-          </BlockStack>
-        </Card>
+                </s-button>
+              </div>
+            </s-stack>
+          </s-stack>
+        </s-section>
 
         {/* Section 2: Delivery & Activity Log */}
-        <Card>
-          <BlockStack gap="400">
-            <Text as="h2" variant="headingMd">Delivery &amp; Activity Log</Text>
+        <s-section>
+          <s-stack gap="base">
+            <s-heading size="small">Delivery &amp; Activity Log</s-heading>
 
             {requests.length === 0 ? (
-              <Box padding="600">
-                <BlockStack gap="200" inlineAlign="center">
-                  <Text as="p" variant="headingSm" tone="subdued">
+              <s-box padding="large">
+                <s-stack gap="extra-tight" alignItems="center">
+                  <s-text tone="subdued" weight="semibold">
                     No invitations sent yet
-                  </Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
+                  </s-text>
+                  <s-text tone="subdued" size="small">
                     Use the form above to send your first customer review invitation.
-                  </Text>
-                </BlockStack>
-              </Box>
+                  </s-text>
+                </s-stack>
+              </s-box>
             ) : (
-              <BlockStack gap="300">
+              <s-stack gap="small">
                 {requests.map((req) => (
-                  <Box key={req.id} background="bg-surface-secondary" padding="300" borderRadius="200">
-                    <InlineStack align="space-between" blockAlign="center">
-                      <BlockStack gap="100">
-                        <Text as="span" variant="bodyMd" fontWeight="semibold">
+                  <s-box key={req.id} background="subdued" padding="base" borderRadius="base">
+                    <s-stack direction="inline" justifyContent="space-between" alignItems="center">
+                      <s-stack gap="extra-tight">
+                        <s-text weight="semibold">
                           {req.customerName || req.customerEmail}
-                        </Text>
-                        <Text as="p" variant="bodySm" tone="subdued">
-                          Order: <Text as="span" fontWeight="medium">{req.orderId}</Text> • Product:{" "}
-                          <Text as="span" fontWeight="medium">{req.productTitle || req.productId}</Text> • Channel:{" "}
+                        </s-text>
+                        <s-text tone="subdued" size="small">
+                          Order: <s-text weight="medium">{req.orderId}</s-text> • Product:{" "}
+                          <s-text weight="medium">{req.productTitle || req.productId}</s-text> • Channel:{" "}
                           {req.channel} • {new Date(req.createdAt).toLocaleString()}
-                        </Text>
-                      </BlockStack>
+                        </s-text>
+                      </s-stack>
 
-                      <Badge
+                      <s-badge
                         tone={
                           req.status === "SENT"
                             ? "success"
@@ -407,16 +382,16 @@ export default function RequestsPage() {
                         }
                       >
                         {req.status}
-                      </Badge>
-                    </InlineStack>
-                  </Box>
+                      </s-badge>
+                    </s-stack>
+                  </s-box>
                 ))}
-              </BlockStack>
+              </s-stack>
             )}
-          </BlockStack>
-        </Card>
-      </BlockStack>
-    </Page>
+          </s-stack>
+        </s-section>
+      </s-stack>
+    </s-page>
   );
 }
 

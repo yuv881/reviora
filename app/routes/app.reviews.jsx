@@ -1,34 +1,36 @@
 import { useState, useEffect } from "react";
 import { useLoaderData, useFetcher, useSubmit, useNavigation, useNavigate } from "react-router";
-import {
-  Page,
-  Card,
-  BlockStack,
-  InlineStack,
-  InlineGrid,
-  TextField,
-  Select,
-  Button,
-  Banner,
-  Modal,
-  Text,
-  Box,
-} from "@shopify/polaris";
+
 import { authenticate } from "../shopify.server.js";
-import { getAdminReviews, deleteReview } from "../models/review.server.js";
+import { getAdminReviews, deleteReview, verifyCustomerByEmail } from "../models/review.server.js";
 import { StoreReviews } from "../models/review.model.js";
 import { connectDB } from "../db.server.js";
 import { ReviewCard } from "../components/ReviewCard.jsx";
 
 export const loader = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
   const url = new URL(request.url);
   const status = url.searchParams.get("status") || "ALL";
   const rating = url.searchParams.get("rating") || "";
   const search = url.searchParams.get("search") || "";
   const page = Number(url.searchParams.get("page") || 1);
   const data = await getAdminReviews(session.shop, { status, rating, search, page });
-  return { ...data, status, rating, search };
+
+  // Verify reviewer against existing customer orders by email
+  const verifiedReviews = await Promise.all(
+    data.reviews.map(async (r) => {
+      if (!r.authorEmail) {
+        return { ...r, verified: false };
+      }
+      const isCustomer = await verifyCustomerByEmail(session.shop, r.authorEmail, admin);
+      return {
+        ...r,
+        verified: isCustomer,
+      };
+    })
+  );
+
+  return { ...data, reviews: verifiedReviews, status, rating, search };
 };
 
 export const action = async ({ request }) => {
@@ -158,104 +160,110 @@ export default function ReviewsManagerPage() {
     { label: "Rejected", value: "REJECTED" },
   ];
 
+  useEffect(() => {
+    if (reviewToDelete) {
+      window.shopify?.modal?.show("delete-review-modal");
+    } else {
+      window.shopify?.modal?.hide("delete-review-modal");
+    }
+  }, [reviewToDelete]);
+
   return (
-    <Page>
-      <ui-title-bar title="Moderation Inbox">
-        <button variant="primary" onClick={() => navigate("/app/import")} >
-          Import & Export
-        </button>
-      </ui-title-bar>
-      <BlockStack gap="500">
+    <s-page heading="Moderation Inbox">
+      <s-button slot="primary-action" variant="primary" onClick={() => navigate("/app/import")}>
+        Import &amp; Export
+      </s-button>
+
+      <s-stack gap="base">
         {/* Filters Card */}
-        <Card>
-          <BlockStack gap="400">
-            <InlineGrid columns={{ xs: 1, md: "1fr 200px auto auto" }} gap="300" alignItems="end">
-              <TextField
-                label="Search Reviews"
-                value={searchQuery}
-                onChange={setSearchQuery}
-                placeholder="Search reviewer name, email, or keywords..."
-                autoComplete="off"
-                clearButton
-                onClearButtonClick={() => setSearchQuery("")}
-              />
+        <s-section>
+          <s-grid gridTemplateColumns="1fr 200px auto auto" gap="small" alignItems="end">
+            <s-text-field
+              label="Search Reviews"
+              value={searchQuery}
+              onInput={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search reviewer name, email, or keywords..."
+            />
 
-              <Select
-                label="Filter by Status"
-                options={statusOptions}
-                value={statusFilter}
-                onChange={setStatusFilter}
-              />
+            <s-select
+              label="Filter by Status"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              {statusOptions.map((opt) => (
+                <s-option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </s-option>
+              ))}
+            </s-select>
 
-              <Button variant="primary" onClick={handleApplyFilter} loading={isFiltering}>
-                Apply Filters
-              </Button>
+            <s-button variant="primary" onClick={handleApplyFilter} loading={isFiltering ? true : undefined}>
+              Apply Filters
+            </s-button>
 
-              {(searchQuery || statusFilter !== "ALL") && (
-                <Button variant="plain" onClick={handleClearFilter} disabled={isFiltering}>
-                  Clear
-                </Button>
-              )}
-            </InlineGrid>
-          </BlockStack>
-        </Card>
+            {(searchQuery || statusFilter !== "ALL") && (
+              <s-button variant="primary" tone="critical" onClick={handleClearFilter} disabled={isFiltering ? true : undefined}>
+                Clear
+              </s-button>
+            )}
+          </s-grid>
+        </s-section>
 
         {/* Interactive Reply Section */}
         {selectedReviewForReply && (
-          <Card>
-            <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">
+          <s-section>
+            <s-stack gap="base">
+              <s-heading size="small">
                 Reply to {selectedReviewForReply.authorName}
-              </Text>
+              </s-heading>
 
-              <Banner tone="info" title="Customer Review">
-                <p>&ldquo;{selectedReviewForReply.body}&rdquo;</p>
-              </Banner>
+              <s-banner tone="info" heading="Customer Review">
+                <s-paragraph>&ldquo;{selectedReviewForReply.body}&rdquo;</s-paragraph>
+              </s-banner>
 
-              <TextField
+              <s-text-field
                 label="Your Public Response"
                 value={replyText}
-                onChange={setReplyText}
-                multiline={3}
-                autoComplete="off"
+                onInput={(e) => setReplyText(e.target.value)}
+                multiline="3"
               />
 
-              <InlineStack gap="300">
-                <Button
+              <s-stack direction="inline" gap="small">
+                <s-button
                   variant="primary"
-                  loading={isSubmitting && submittingIntent === "reply"}
+                  loading={isSubmitting && submittingIntent === "reply" ? true : undefined}
                   onClick={handleReplySubmit}
                 >
                   Post Public Response
-                </Button>
-                <Button
+                </s-button>
+                <s-button
                   variant="secondary"
-                  disabled={isSubmitting && submittingIntent === "reply"}
+                  disabled={isSubmitting && submittingIntent === "reply" ? true : undefined}
                   onClick={() => setSelectedReviewForReply(null)}
                 >
                   Cancel
-                </Button>
-              </InlineStack>
-            </BlockStack>
-          </Card>
+                </s-button>
+              </s-stack>
+            </s-stack>
+          </s-section>
         )}
 
         {/* Review Cards Listing */}
         {reviews.length === 0 ? (
-          <Card>
-            <Box padding="600">
-              <BlockStack gap="200" inlineAlign="center">
-                <Text as="p" variant="headingSm" tone="subdued">
+          <s-section>
+            <s-box padding="large">
+              <s-stack gap="extra-tight" alignItems="center">
+                <s-text tone="subdued" weight="semibold">
                   No reviews match your filters
-                </Text>
-                <Text as="p" variant="bodySm" tone="subdued">
+                </s-text>
+                <s-text tone="subdued" size="small">
                   Try adjusting your search criteria or switch status to &ldquo;All Statuses&rdquo;.
-                </Text>
-              </BlockStack>
-            </Box>
-          </Card>
+                </s-text>
+              </s-stack>
+            </s-box>
+          </s-section>
         ) : (
-          <BlockStack gap="400">
+          <s-stack gap="base">
             {reviews.map((r) => (
               <ReviewCard
                 key={r.id}
@@ -268,43 +276,48 @@ export default function ReviewsManagerPage() {
                 onReply={handleOpenReply}
               />
             ))}
-          </BlockStack>
+          </s-stack>
         )}
-      </BlockStack>
+      </s-stack>
 
-      {/* Polaris Modal for Delete Confirmation */}
-      <Modal
-        open={Boolean(reviewToDelete)}
-        onClose={() => setReviewToDelete(null)}
-        title="Delete Review?"
-        primaryAction={{
-          content: "Delete Review",
-          destructive: true,
-          loading: isSubmitting && submittingIntent === "delete",
-          onAction: confirmDelete,
-        }}
-        secondaryActions={[
-          {
-            content: "Cancel",
-            onAction: () => setReviewToDelete(null),
-          },
-        ]}
-      >
-        <Modal.Section>
-          <BlockStack gap="300">
-            <Text as="p">
+      {/* App Bridge Modal for Delete Confirmation */}
+      {reviewToDelete && (
+        <s-modal
+          id="delete-review-modal"
+          heading="Delete Review?"
+          open
+          onClose={() => setReviewToDelete(null)}
+        >
+          <s-stack gap="base">
+            <s-paragraph>
               Are you sure you want to permanently delete this review by{" "}
-              <Text as="span" fontWeight="bold">{reviewToDelete?.authorName}</Text>? This action cannot be undone.
-            </Text>
+              <s-text weight="bold">{reviewToDelete?.authorName}</s-text>? This action cannot be undone.
+            </s-paragraph>
             {reviewToDelete?.title && (
-              <Banner tone="warning" title="Review Title">
-                <p>&ldquo;{reviewToDelete.title}&rdquo;</p>
-              </Banner>
+              <s-banner tone="warning" heading="Review Title">
+                <s-paragraph>&ldquo;{reviewToDelete.title}&rdquo;</s-paragraph>
+              </s-banner>
             )}
-          </BlockStack>
-        </Modal.Section>
-      </Modal>
-    </Page>
+          </s-stack>
+          <s-button
+            slot="primary-action"
+            variant="primary"
+            tone="critical"
+            loading={isSubmitting && submittingIntent === "delete" ? true : undefined}
+            onClick={confirmDelete}
+          >
+            Delete Review
+          </s-button>
+          <s-button
+            slot="secondary-actions"
+            variant="secondary"
+            onClick={() => setReviewToDelete(null)}
+          >
+            Cancel
+          </s-button>
+        </s-modal>
+      )}
+    </s-page>
   );
 }
 

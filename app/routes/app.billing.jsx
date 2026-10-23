@@ -2,20 +2,6 @@
 import { useState, useEffect } from "react";
 import process from "process";
 import { useLoaderData, useNavigation, useSubmit, useActionData, redirect } from "react-router";
-import {
-  Page,
-  Card,
-  BlockStack,
-  InlineGrid,
-  InlineStack,
-  Badge,
-  Button,
-  Divider,
-  Text,
-  Box,
-  Modal,
-  Banner,
-} from "@shopify/polaris";
 import { authenticate } from "../shopify.server.js";
 import { getShopSettings, updateShopSettings } from "../models/review.server.js";
 import { Check } from "lucide-react";
@@ -196,6 +182,20 @@ export default function BillingPage() {
   const handlePlanSelect = (planKey) => {
     if (planKey === activePlanKey) return;
     setSelectedPlanForModal(planKey);
+    if (window.shopify?.modal) {
+      window.shopify.modal.show("billing-confirm-modal");
+    } else {
+      document.getElementById("billing-confirm-modal")?.showOverlay();
+    }
+  };
+
+  const closeModal = () => {
+    if (window.shopify?.modal) {
+      window.shopify.modal.hide("billing-confirm-modal");
+    } else {
+      document.getElementById("billing-confirm-modal")?.hideOverlay();
+    }
+    setSelectedPlanForModal(null);
   };
 
   const handleConfirmPlanChange = () => {
@@ -208,7 +208,7 @@ export default function BillingPage() {
       formData.append("plan", "PRO");
     }
     submit(formData, { method: "post" });
-    setSelectedPlanForModal(null);
+    closeModal();
   };
 
   const freeFeatures = [
@@ -231,200 +231,163 @@ export default function BillingPage() {
   ];
 
   return (
-    <Page narrowWidth>
-      <ui-title-bar title="Subscription & Plans" />
-
-      <BlockStack gap="400">
+    <s-page heading="Subscription & Plans" inlineSize="small">
+      <s-stack gap="base">
         {actionData?.error && (
-          <Banner tone="critical" title="Billing Error">
-            <p>{actionData.error}</p>
-          </Banner>
+          <s-banner tone="critical" heading="Billing Error">
+            <s-paragraph>{actionData.error}</s-paragraph>
+          </s-banner>
         )}
 
-        {/* Current Active Plan Status Bar */}
-        <Card padding="400">
-          <InlineStack align="space-between" blockAlign="center" wrap gap="200">
-            <InlineStack gap="200" blockAlign="center">
-              <Text as="span" variant="bodyMd" fontWeight="semibold">
-                Current Plan:
-              </Text>
-              <Badge tone={activePlanKey === "PRO" ? "success" : "info"}>
-                {activePlanKey === "PRO" ? "Pro Plan ($4.99/mo)" : "Free Plan ($0/mo)"}
-              </Badge>
-            </InlineStack>
-
-            <Text as="span" variant="bodySm" tone="subdued">
-              Billed directly through your Shopify invoice
-            </Text>
-          </InlineStack>
-        </Card>
-
         {/* 2-Column Plan Grid */}
-        <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
+        <s-grid gridTemplateColumns="1fr 1fr" gap="base">
           {/* Free Plan Card */}
-          <Card padding="500">
-            <BlockStack gap="400">
-              <InlineStack align="space-between" blockAlign="center">
-                <Text as="h2" variant="headingLg">
-                  Free
-                </Text>
-                {activePlanKey === "FREE" && <Badge tone="info">Active</Badge>}
-              </InlineStack>
+          <s-section>
+            <s-stack gap="base">
+              <s-stack direction="inline" justifyContent="space-between" alignItems="center">
+                <s-heading>Free</s-heading>
+                {activePlanKey === "FREE" && <s-badge tone="info">Active</s-badge>}
+              </s-stack>
 
-              <Text as="p" variant="bodySm" tone="subdued">
+              <s-paragraph color="subdued">
                 Essential review collection and star rating widgets for stores getting started.
-              </Text>
+              </s-paragraph>
 
-              <InlineStack gap="100" blockAlign="baseline">
-                <Text as="span" variant="heading2xl" fontWeight="bold">
-                  $0
-                </Text>
-                <Text as="span" variant="bodySm" tone="subdued">
-                  / forever
-                </Text>
-              </InlineStack>
+              <s-stack direction="inline" gap="extra-tight" alignItems="baseline">
+                <h1 style={{ fontSize: "24px", fontWeight: "bold" }}>$0</h1>
+                <s-text color="subdued">/ forever</s-text>
+              </s-stack>
 
-              <Button
-                size="large"
+              <s-button
                 variant="secondary"
                 disabled={activePlanKey === "FREE" || isSubmitting}
                 loading={isSubmitting && selectedPlanForModal === "FREE"}
                 onClick={() => handlePlanSelect("FREE")}
-                fullWidth
               >
                 {activePlanKey === "FREE" ? "Current Plan" : "Downgrade to Free"}
-              </Button>
+              </s-button>
 
-              <Divider />
+              <s-divider></s-divider>
 
-              <BlockStack gap="200">
-                <Text as="h3" variant="headingXs">
-                  What&apos;s included:
-                </Text>
+              <s-stack gap="small">
+                <s-text type="strong">What&apos;s included:</s-text>
 
-                <BlockStack gap="150">
+                <s-stack gap="small">
                   {freeFeatures.map((feat, idx) => (
-                    <InlineStack key={idx} gap="150" blockAlign="start" wrap={false}>
-                      <Box minWidth="16px" paddingTop="050">
+                    <div
+                      key={idx}
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: "8px",
+                      }}
+                    >
+                      <span style={{ flexShrink: 0, marginTop: "2px", display: "inline-flex" }}>
                         <Check size={16} color="#10b981" strokeWidth={2.5} />
-                      </Box>
-                      <Text as="span" variant="bodySm">
-                        {feat}
-                      </Text>
-                    </InlineStack>
+                      </span>
+                      <s-text>{feat}</s-text>
+                    </div>
                   ))}
-                </BlockStack>
-              </BlockStack>
-            </BlockStack>
-          </Card>
+                </s-stack>
+              </s-stack>
+            </s-stack>
+          </s-section>
 
           {/* Pro Plan Card */}
           <div className={activePlanKey !== "PRO" ? "reviora-plan-card-featured" : ""}>
-            <Card padding="500">
-              <BlockStack gap="400">
-                <InlineStack align="space-between" blockAlign="center">
-                  <Text as="h2" variant="headingLg">
-                    Pro
-                  </Text>
+            <s-section>
+              <s-stack gap="base">
+                <s-stack direction="inline" justifyContent="space-between" alignItems="center">
+                  <s-heading>Pro</s-heading>
                   {activePlanKey === "PRO" ? (
-                    <Badge tone="success">Active</Badge>
+                    <s-badge tone="success">Active</s-badge>
                   ) : (
-                    <Badge tone="magic">Recommended</Badge>
+                    <s-badge tone="info">Recommended</s-badge>
                   )}
-                </InlineStack>
+                </s-stack>
 
-                <Text as="p" variant="bodySm" tone="subdued">
+                <s-paragraph color="subdued">
                   Unlimited review requests, photo uploads, and priority support.
-                </Text>
+                </s-paragraph>
 
-                <InlineStack gap="100" blockAlign="baseline">
-                  <Text as="span" variant="heading2xl" fontWeight="bold">
-                    $4.99
-                  </Text>
-                  <Text as="span" variant="bodySm" tone="subdued">
-                    / month
-                  </Text>
-                </InlineStack>
+                <s-stack direction="inline" gap="extra-tight" alignItems="baseline">
+                  <h1 style={{ fontSize: "24px", fontWeight: "bold" }}>$4.99</h1>
+                  <s-text color="subdued">/ month</s-text>
+                </s-stack>
 
-                <Button
-                  size="large"
+                <s-button
                   variant={activePlanKey === "PRO" ? "secondary" : "primary"}
                   disabled={activePlanKey === "PRO" || isSubmitting}
                   loading={isSubmitting && selectedPlanForModal === "PRO"}
                   onClick={() => handlePlanSelect("PRO")}
-                  fullWidth
                 >
                   {activePlanKey === "PRO" ? "Current Plan" : "Upgrade to Pro"}
-                </Button>
+                </s-button>
 
-                <Divider />
+                <s-divider></s-divider>
 
-                <BlockStack gap="200">
-                  <Text as="h3" variant="headingXs">
-                    Everything in Free, plus:
-                  </Text>
+                <s-stack gap="small">
+                  <s-text type="strong">Everything in Free, plus:</s-text>
 
-                  <BlockStack gap="150">
+                  <s-stack gap="small">
                     {proFeatures.map((feat, idx) => (
-                      <InlineStack key={idx} gap="150" blockAlign="start" wrap={false}>
-                        <Box minWidth="16px" paddingTop="050">
+                      <div
+                        key={idx}
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: "8px",
+                        }}
+                      >
+                        <span style={{ flexShrink: 0, marginTop: "2px", display: "inline-flex" }}>
                           <Check size={16} color="#10b981" strokeWidth={2.5} />
-                        </Box>
-                        <Text as="span" variant="bodySm">
-                          {feat}
-                        </Text>
-                      </InlineStack>
+                        </span>
+                        <s-text>{feat}</s-text>
+                      </div>
                     ))}
-                  </BlockStack>
-                </BlockStack>
-              </BlockStack>
-            </Card>
+                  </s-stack>
+                </s-stack>
+              </s-stack>
+            </s-section>
           </div>
-        </InlineGrid>
-
-        {/* Subtle Footer Note */}
-        <Box paddingBlockStart="100">
-          <Text as="p" variant="bodyXs" tone="subdued" alignment="center">
-            All plans include a 14-day free trial on upgrade · Billed directly through Shopify · Cancel anytime
-          </Text>
-        </Box>
-      </BlockStack>
+        </s-grid>
+      </s-stack>
 
       {/* Confirmation Modal */}
-      {selectedPlanForModal && (
-        <Modal
-          open={Boolean(selectedPlanForModal)}
-          onClose={() => setSelectedPlanForModal(null)}
-          title={selectedPlanForModal === "PRO" ? "Upgrade to Pro Plan?" : "Downgrade to Free Plan?"}
-          primaryAction={{
-            content: selectedPlanForModal === "PRO" ? "Confirm & Continue to Shopify" : "Confirm Downgrade",
-            onAction: handleConfirmPlanChange,
-            loading: isSubmitting,
-          }}
-          secondaryActions={[
-            {
-              content: "Cancel",
-              onAction: () => setSelectedPlanForModal(null),
-              disabled: isSubmitting,
-            },
-          ]}
+      <s-modal
+        id="billing-confirm-modal"
+        heading={selectedPlanForModal === "PRO" ? "Upgrade to Pro Plan?" : "Downgrade to Free Plan?"}
+      >
+        <s-stack gap="base">
+          <s-banner tone="info">
+            <s-paragraph>
+              {selectedPlanForModal === "PRO"
+                ? "Upgrading to Pro starts with a 14-day free trial. You will be redirected to Shopify to approve the $4.99/month charge."
+                : "Downgrading to Free will cancel your paid recurring charge. Any reviews previously collected remain safe on your store."}
+            </s-paragraph>
+          </s-banner>
+          <s-paragraph color="subdued">
+            Subscription changes take effect immediately on your Shopify billing account.
+          </s-paragraph>
+        </s-stack>
+        <s-button
+          slot="primary-action"
+          variant="primary"
+          loading={isSubmitting}
+          onClick={handleConfirmPlanChange}
         >
-          <Modal.Section>
-            <BlockStack gap="300">
-              <Banner tone="info">
-                <p>
-                  {selectedPlanForModal === "PRO"
-                    ? "Upgrading to Pro starts with a 14-day free trial. You will be redirected to Shopify to approve the $4.99/month charge."
-                    : "Downgrading to Free will cancel your paid recurring charge. Any reviews previously collected remain safe on your store."}
-                </p>
-              </Banner>
-              <Text as="p" variant="bodySm" tone="subdued">
-                Subscription changes take effect immediately on your Shopify billing account.
-              </Text>
-            </BlockStack>
-          </Modal.Section>
-        </Modal>
-      )}
-    </Page>
+          {selectedPlanForModal === "PRO" ? "Confirm & Continue to Shopify" : "Confirm Downgrade"}
+        </s-button>
+        <s-button
+          slot="secondary-actions"
+          disabled={isSubmitting}
+          commandFor="billing-confirm-modal"
+          command="--hide"
+          onClick={closeModal}
+        >
+          Cancel
+        </s-button>
+      </s-modal>
+    </s-page>
   );
 }
