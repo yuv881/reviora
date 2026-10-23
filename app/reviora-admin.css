@@ -1,1 +1,13 @@
-/* Reviora Admin Styles - Handled natively by @shopify/polaris */
+/* Reviora Admin Styles - Native Shopify Polaris styling */
+
+/* Clean plan card container with zero hover jump */
+.reviora-plan-card {
+  position: relative;
+  height: 100%;
+}
+
+.reviora-plan-card-featured {
+  border-radius: var(--p-border-radius-300, 12px);
+  border: 2px solid #005bd3;
+  box-shadow: 0 0 0 1px rgba(0, 91, 211, 0.1);
+}

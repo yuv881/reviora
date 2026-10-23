@@ -14,7 +14,7 @@ const ShopSettingSchema = new mongoose.Schema(
       default: "Thank you for your order! We would love to hear your feedback on your recent purchase.",
     },
     enableAiFeatures: { type: Boolean, default: true },
-    plan: { type: String, enum: ["FREE", "GROWTH", "ENTERPRISE"], default: "GROWTH" },
+    plan: { type: String, enum: ["FREE", "PRO"], default: "FREE" },
   },
   {
     timestamps: true,
