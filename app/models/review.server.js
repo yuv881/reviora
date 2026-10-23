@@ -330,17 +330,32 @@ export async function exportReviewsToCsv(shop) {
   const reviews = storeDoc?.reviews || [];
 
   const headers = ["title", "body", "rating", "review_date", "reviewer_name", "reviewer_email", "product_handle", "status", "verified"];
-  const rows = reviews.map((r) => [
-    `"${(r.title || "").replace(/"/g, '""')}"`,
-    `"${(r.body || "").replace(/"/g, '""')}"`,
-    r.rating || 5,
-    `"${new Date(r.createdAt).toISOString().split("T")[0]}"`,
-    `"${(r.authorName || "").replace(/"/g, '""')}"`,
-    `"${(r.authorEmail || "").replace(/"/g, '""')}"`,
-    `"${(r.productHandle || r.productId || "").replace(/"/g, '""')}"`,
-    `"${r.status || "PUBLISHED"}"`,
-    r.verified ? "true" : "false",
-  ]);
+  const rows = reviews.map((r) => {
+    let dateStr = "";
+    if (r.createdAt) {
+      try {
+        const d = new Date(r.createdAt);
+        dateStr = isNaN(d.getTime()) ? "" : d.toISOString().split("T")[0];
+      } catch {
+        dateStr = "";
+      }
+    }
+    if (!dateStr) {
+      dateStr = new Date().toISOString().split("T")[0];
+    }
+
+    return [
+      `"${(r.title || "").replace(/"/g, '""')}"`,
+      `"${(r.body || "").replace(/"/g, '""')}"`,
+      r.rating || 5,
+      `"${dateStr}"`,
+      `"${(r.authorName || "").replace(/"/g, '""')}"`,
+      `"${(r.authorEmail || "").replace(/"/g, '""')}"`,
+      `"${(r.productHandle || r.productId || "").replace(/"/g, '""')}"`,
+      `"${r.status || "PUBLISHED"}"`,
+      r.verified ? "true" : "false",
+    ];
+  });
 
   return [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
 }

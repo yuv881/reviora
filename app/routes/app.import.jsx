@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useActionData, useNavigation, useSubmit } from "react-router";
+import { useState, useEffect } from "react";
+import { useActionData, useNavigation, useSubmit, useFetcher } from "react-router";
 import {
   Page,
   Card,
@@ -38,6 +38,23 @@ export const loader = async ({ request }) => {
 export const action = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const formData = await request.formData();
+  const intent = formData.get("intent");
+
+  if (intent === "export") {
+    try {
+      const csvData = await exportReviewsToCsv(session.shop);
+      const safeShop = (session.shop || "store").replace(/[^a-z0-9]/gi, "_");
+      return {
+        exportSuccess: true,
+        csvData,
+        filename: `reviora_reviews_${safeShop}_export.csv`,
+      };
+    } catch (err) {
+      console.error("Export reviews error:", err);
+      return { exportError: "Failed to generate CSV export. Please try again." };
+    }
+  }
+
   const rawCsv = formData.get("rawCsv");
 
   if (!rawCsv || !rawCsv.trim()) {
@@ -99,13 +116,37 @@ export default function ImportPage() {
   const actionData = useActionData();
   const navigation = useNavigation();
   const submit = useSubmit();
+  const exportFetcher = useFetcher();
+
   const isImporting = navigation.state === "submitting";
+  const isExporting = exportFetcher.state !== "idle";
 
   const [csvContent, setCsvContent] = useState("");
   const [fileName, setFileName] = useState("");
   const [rowCount, setRowCount] = useState(0);
   const [sourceFormat, setSourceFormat] = useState("judge_me");
   const [showRawEditor, setShowRawEditor] = useState(false);
+
+  // Trigger client-side file download when export completes
+  useEffect(() => {
+    if (exportFetcher.data?.exportSuccess && exportFetcher.data?.csvData) {
+      const blob = new Blob([exportFetcher.data.csvData], {
+        type: "text/csv;charset=utf-8;",
+      });
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.setAttribute("download", exportFetcher.data.filename || "reviews_export.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+    }
+  }, [exportFetcher.data]);
+
+  const handleExport = () => {
+    exportFetcher.submit({ intent: "export" }, { method: "POST" });
+  };
 
   const processFile = (file) => {
     if (!file) return;
@@ -175,6 +216,20 @@ export default function ImportPage() {
         {actionData?.error && (
           <Banner tone="critical" title="Import Error" onDismiss={() => { }}>
             <p>{actionData.error}</p>
+          </Banner>
+        )}
+
+        {exportFetcher.data?.exportSuccess && (
+          <Banner tone="success" title="Export Downloaded">
+            <p>
+              Your CSV reviews backup (<strong>{exportFetcher.data.filename}</strong>) has been downloaded successfully.
+            </p>
+          </Banner>
+        )}
+
+        {exportFetcher.data?.exportError && (
+          <Banner tone="critical" title="Export Failed">
+            <p>{exportFetcher.data.exportError}</p>
           </Banner>
         )}
 
@@ -268,7 +323,11 @@ export default function ImportPage() {
                   Download all customer reviews currently stored in your Reviora database as a CSV file.
                 </Text>
               </BlockStack>
-              <Button variant="secondary" url="/app/import?export=true">
+              <Button
+                variant="primary"
+                loading={isExporting}
+                onClick={handleExport}
+              >
                 Export All Reviews (CSV)
               </Button>
             </InlineStack>
