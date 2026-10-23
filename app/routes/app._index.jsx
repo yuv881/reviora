@@ -1,6 +1,5 @@
 import { useLoaderData, Link } from "react-router";
-import { boundary } from "@shopify/shopify-app-react-router/server";
-import { TitleBar } from "@shopify/app-bridge-react";
+import { Page, Layout, Card, InlineGrid, BlockStack, InlineStack, Badge, Text, Box, Button } from "@shopify/polaris";
 import { authenticate } from "../shopify.server.js";
 import { getDashboardMetrics } from "../models/review.server.js";
 import { StoreReviews } from "../models/review.model.js";
@@ -8,7 +7,7 @@ import { connectDB } from "../db.server.js";
 import { MetricCard } from "../components/MetricCard.jsx";
 import { RatingBreakdown } from "../components/RatingBreakdown.jsx";
 import { StarRating } from "../components/StarRating.jsx";
-import { Star, MessageSquare, Clock, Send, CheckCircle2, ArrowRight } from "lucide-react";
+import { Star, MessageSquare, Clock, Send } from "lucide-react";
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
@@ -29,176 +28,167 @@ export const loader = async ({ request }) => {
 };
 
 export default function DashboardPage() {
-  const { metrics, recentReviews } = useLoaderData();
+  const loaderData = useLoaderData();
+  const metrics = loaderData?.metrics || {
+    averageRating: 0,
+    totalReviews: 0,
+    publishedReviews: 0,
+    pendingReviews: 0,
+    totalRequests: 0,
+    distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
+  };
+  const recentReviews = loaderData?.recentReviews || [];
 
   return (
-    <div className="reviora-page-wrapper">
-      <TitleBar title="Dashboard" />
+    <Page>
+      <ui-title-bar title="Dashboard"></ui-title-bar>
+      <BlockStack gap="500">
+        {/* KPI Cards Grid */}
+        <InlineGrid columns={{ xs: 1, sm: 2, md: 4 }} gap="400">
+          <MetricCard
+            label="Overall Rating"
+            value={`★ ${metrics.averageRating}`}
+            subtext="Across all published reviews"
+            icon={Star}
+            tone="success"
+          />
 
-      {/* KPI Cards Grid with Lucide Icons */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: "16px",
-          marginBottom: "24px",
-        }}
-      >
-        <MetricCard
-          label="Overall Rating"
-          value={`★ ${metrics.averageRating}`}
-          subtext="Across all published reviews"
-          icon={Star}
-          tone="success"
-        />
+          <MetricCard
+            label="Total Reviews"
+            value={metrics.totalReviews}
+            subtext={`${metrics.publishedReviews} active on storefront`}
+            icon={MessageSquare}
+            tone="default"
+          />
 
-        <MetricCard
-          label="Total Reviews"
-          value={metrics.totalReviews}
-          subtext={`${metrics.publishedReviews} active on storefront`}
-          icon={MessageSquare}
-          tone="default"
-        />
+          <MetricCard
+            label="Pending Moderation"
+            value={metrics.pendingReviews}
+            subtext={
+              metrics.pendingReviews > 0
+                ? `${metrics.pendingReviews} waiting for approval`
+                : "All reviews moderated"
+            }
+            icon={Clock}
+            tone={metrics.pendingReviews > 0 ? "warning" : "success"}
+          />
 
-        <MetricCard
-          label="Pending Moderation"
-          value={metrics.pendingReviews}
-          subtext={
-            metrics.pendingReviews > 0
-              ? `${metrics.pendingReviews} waiting for approval`
-              : "All reviews moderated"
-          }
-          icon={Clock}
-          tone={metrics.pendingReviews > 0 ? "warning" : "success"}
-        />
+          <MetricCard
+            label="Review Requests Sent"
+            value={metrics.totalRequests}
+            subtext="Automated fulfillment notifications"
+            icon={Send}
+            tone="default"
+          />
+        </InlineGrid>
 
-        <MetricCard
-          label="Review Requests Sent"
-          value={metrics.totalRequests}
-          subtext="Automated fulfillment notifications"
-          icon={Send}
-          tone="default"
-        />
-      </div>
+        {/* 2-Column Section: Rating Breakdown + Next Steps */}
+        <Layout>
+          <Layout.Section variant="oneHalf">
+            <RatingBreakdown
+              distribution={metrics.distribution}
+              total={metrics.publishedReviews}
+              averageRating={metrics.averageRating}
+            />
+          </Layout.Section>
 
-      {/* 2-Column Section: Breakdown + Onboarding */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1.2fr 1fr",
-          gap: "20px",
-          marginBottom: "24px",
-        }}
-      >
-        <RatingBreakdown
-          distribution={metrics.distribution}
-          total={metrics.publishedReviews}
-          averageRating={metrics.averageRating}
-        />
+          <Layout.Section variant="oneHalf">
+            <Card>
+              <BlockStack gap="400">
+                <Text as="h2" variant="headingMd">Setup &amp; Next Steps</Text>
 
-        <div className="reviora-card" style={{ marginBottom: 0 }}>
-          <h2 style={{ fontSize: "15px", fontWeight: "600", margin: "0 0 16px 0", color: "#202223" }}>
-            Setup &amp; Next Steps
-          </h2>
+                <BlockStack gap="300">
+                  <InlineStack gap="300" blockAlign="center">
+                    <Badge tone="success">Ready</Badge>
+                    <Text as="span" variant="bodyMd">
+                      Theme App Extension block installed
+                    </Text>
+                  </InlineStack>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "20px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "13px" }}>
-              <span className="reviora-badge-pill reviora-badge-success" style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                <CheckCircle2 size={12} />
-                Ready
-              </span>
-              <span>Theme App Extension block installed</span>
-            </div>
+                  <InlineStack gap="300" blockAlign="center">
+                    <Badge tone="info">Config</Badge>
+                    <Link to="/app/settings" style={{ textDecoration: "none" }}>
+                      <Button variant="plain">
+                        Customize Star Colors &amp; Auto-Publish Rules →
+                      </Button>
+                    </Link>
+                  </InlineStack>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "13px" }}>
-              <span className="reviora-badge-pill reviora-badge-info">Config</span>
-              <Link to="/app/settings" style={{ color: "#005BD3", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                Customize Star Colors &amp; Auto-Publish Rules
-                <ArrowRight size={12} />
-              </Link>
-            </div>
+                  <InlineStack gap="300" blockAlign="center">
+                    <Badge tone="info">Import</Badge>
+                    <Link to="/app/import" style={{ textDecoration: "none" }}>
+                      <Button variant="plain">
+                        Import Existing Reviews from Judge.me / CSV →
+                      </Button>
+                    </Link>
+                  </InlineStack>
+                </BlockStack>
+              </BlockStack>
+            </Card>
+          </Layout.Section>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "13px" }}>
-              <span className="reviora-badge-pill reviora-badge-info">Import</span>
-              <Link to="/app/import" style={{ color: "#005BD3", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                Import Existing Reviews from Judge.me / CSV
-                <ArrowRight size={12} />
-              </Link>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-      {/* Recent Reviews Activity */}
-      <div className="reviora-card">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-          <h2 style={{ fontSize: "15px", fontWeight: "600", margin: 0, color: "#202223" }}>
-            Recent Reviews Activity
-          </h2>
-          <Link to="/app/reviews" className="reviora-btn reviora-btn-plain" style={{ fontSize: "13px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-            View Moderation Inbox
-            <ArrowRight size={13} />
-          </Link>
-        </div>
-
-        {recentReviews.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "32px 16px", color: "#6D7175" }}>
-            <p style={{ fontSize: "14px", margin: "0 0 6px 0", fontWeight: "500" }}>No reviews collected yet</p>
-            <p style={{ fontSize: "13px", margin: 0 }}>
-              Customer reviews will appear here once submitted on your store or imported.
-            </p>
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            {recentReviews.map((r) => (
-              <div
-                key={r.id}
-                style={{
-                  border: "1px solid #E1E3E5",
-                  borderRadius: "6px",
-                  padding: "14px 16px",
-                  backgroundColor: "#FAFAFA",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "6px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <StarRating rating={r.rating} size={14} />
-                    <strong style={{ fontSize: "14px", color: "#202223" }}>{r.title || "Customer Review"}</strong>
-                  </div>
-                  <span
-                    className={`reviora-badge-pill ${r.status === "PUBLISHED" ? "reviora-badge-success" : "reviora-badge-warning"
-                      }`}
-                  >
-                    {r.status}
-                  </span>
-                </div>
-
-                <p style={{ fontSize: "13px", color: "#4B5563", margin: "0 0 8px 0", lineHeight: "1.5" }}>
-                  {r.body}
-                </p>
-
-                <div style={{ fontSize: "12px", color: "#6D7175" }}>
-                  By <strong>{r.authorName}</strong> on {new Date(r.createdAt).toLocaleDateString()}
-                  {r.verified && (
-                    <span style={{ marginLeft: "8px", color: "#108043", fontWeight: "600", display: "inline-flex", alignItems: "center", gap: "3px" }}>
-                      <CheckCircle2 size={11} /> Verified Buyer
-                    </span>
+          {/* Recent Reviews Activity Section */}
+          <Layout.Section>
+            <Card>
+              <BlockStack gap="400">
+                <InlineStack align="space-between" blockAlign="center">
+                  <Text as="h2" variant="headingMd">Recent Reviews Activity</Text>
+                  {recentReviews.length > 0 && (
+                    <Link to="/app/reviews" style={{ textDecoration: "none" }}>
+                      <Button variant="plain">
+                        View all in Moderation Inbox →
+                      </Button>
+                    </Link>
                   )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+                </InlineStack>
+
+                {recentReviews.length === 0 ? (
+                  <Box padding="600">
+                    <BlockStack gap="200" inlineAlign="center">
+                      <Text as="p" variant="headingSm" tone="subdued">
+                        No reviews collected yet
+                      </Text>
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        Customer reviews will appear here once submitted on your store or imported.
+                      </Text>
+                    </BlockStack>
+                  </Box>
+                ) : (
+                  <BlockStack gap="300">
+                    {recentReviews.map((r) => (
+                      <Box key={r.id} background="bg-surface-secondary" padding="300" borderRadius="200">
+                        <BlockStack gap="200">
+                          <InlineStack align="space-between" blockAlign="center">
+                            <InlineStack gap="200" blockAlign="center">
+                              <StarRating rating={r.rating} size={14} />
+                              <Text as="span" variant="bodyMd" fontWeight="semibold">
+                                {r.title || "Customer Review"}
+                              </Text>
+                            </InlineStack>
+                            <Badge tone={r.status === "PUBLISHED" ? "success" : "warning"}>
+                              {r.status}
+                            </Badge>
+                          </InlineStack>
+
+                          <Text as="p" variant="bodyMd">{r.body}</Text>
+
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            By <Text as="span" fontWeight="medium">{r.authorName}</Text> on{" "}
+                            {new Date(r.createdAt).toLocaleDateString()}
+                            {r.verified && " • Verified Buyer"}
+                          </Text>
+                        </BlockStack>
+                      </Box>
+                    ))}
+                  </BlockStack>
+                )}
+              </BlockStack>
+            </Card>
+          </Layout.Section>
+        </Layout>
+      </BlockStack>
+    </Page>
   );
 }
 
-export function ErrorBoundary() {
-  return boundary.error();
-}
 
-export const headers = (headersArgs) => {
-  return boundary.headers(headersArgs);
-};

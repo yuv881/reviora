@@ -1,22 +1,24 @@
-import { useState, useEffect } from "react";
-import { useLoaderData, useFetcher, useSubmit } from "react-router";
-import { boundary } from "@shopify/shopify-app-react-router/server";
-import { TitleBar } from "@shopify/app-bridge-react";
+import { useState, useEffect, useMemo } from "react";
+import { useLoaderData, useFetcher, useSubmit, useNavigation } from "react-router";
+import {
+  Page,
+  Card,
+  BlockStack,
+  InlineStack,
+  InlineGrid,
+  TextField,
+  Select,
+  Button,
+  Banner,
+  Badge,
+  Divider,
+  Text,
+  Box,
+} from "@shopify/polaris";
 import { authenticate } from "../shopify.server.js";
 import { ReviewRequest } from "../models/reviewRequest.model.js";
 import { connectDB } from "../db.server.js";
 import { sendReviewRequestEmail } from "../utils/email.server.js";
-import {
-  Mail,
-  Send,
-  User,
-  Package,
-  ShoppingBag,
-  CheckCircle2,
-  AlertCircle,
-  Search,
-  X,
-} from "lucide-react";
 import { GET_RECENT_ORDERS_QUERY } from "../graphql/index.js";
 
 export const loader = async ({ request }) => {
@@ -28,7 +30,8 @@ export const loader = async ({ request }) => {
 
   let orders = [];
   try {
-    const variables = { first: 50 };
+    // Lean 20 orders to keep page transitions super snappy
+    const variables = { first: 20 };
     if (q) {
       variables.query = q;
     }
@@ -151,10 +154,15 @@ export const action = async ({ request }) => {
 };
 
 export default function RequestsPage() {
-  const { requests, orders = [], searchQuery = "" } = useLoaderData();
+  const loaderData = useLoaderData();
+  const requests = loaderData?.requests || [];
+  const orders = useMemo(() => loaderData?.orders || [], [loaderData?.orders]);
+  const searchQuery = loaderData?.searchQuery || "";
   const fetcher = useFetcher();
   const submit = useSubmit();
+  const navigation = useNavigation();
   const isSending = fetcher.state === "submitting";
+  const isSearching = navigation.state === "loading" && navigation.location?.search !== "";
 
   // Search input state
   const [searchInput, setSearchInput] = useState(searchQuery);
@@ -168,7 +176,7 @@ export default function RequestsPage() {
   const [orderNumber, setOrderNumber] = useState("");
   const [selectedProductIndex, setSelectedProductIndex] = useState(0);
 
-  // Manual fallback inputs
+  // Manual fallback input
   const [manualProductTitle, setManualProductTitle] = useState("");
 
   const currentOrder = orders.find((o) => o.id === selectedOrderId);
@@ -200,7 +208,7 @@ export default function RequestsPage() {
       : null;
 
   const handleSearchSubmit = (e) => {
-    if (e) e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     submit({ q: searchInput }, { method: "GET" });
   };
 
@@ -209,425 +217,205 @@ export default function RequestsPage() {
     submit({}, { method: "GET" });
   };
 
-  const handleSend = (e) => {
-    e.preventDefault();
-    const form = e.target;
-    fetcher.submit(new FormData(form), { method: "POST" });
+  const handleSend = () => {
+    fetcher.submit(
+      {
+        intent: "send_manual",
+        orderId: orderNumber || `MANUAL-${Date.now()}`,
+        productTitle: currentProduct ? currentProduct.title : manualProductTitle,
+        productId: currentProduct ? currentProduct.productId : "custom-product",
+        productHandle: currentProduct ? currentProduct.productHandle : "",
+        customerName,
+        customerEmail,
+      },
+      { method: "POST" }
+    );
   };
 
+  const orderSelectOptions =
+    orders.length === 0
+      ? [
+        {
+          label: searchQuery
+            ? `No delivered orders matching "${searchQuery}" (Enter Manually)`
+            : "No delivered orders found yet (Enter Manually)",
+          value: "manual",
+        },
+      ]
+      : [
+        ...orders.map((o) => ({
+          label: `${o.orderNumber} — ${o.customerName} (${o.customerEmail || "No email"}) • [${o.fulfillmentStatus}]`,
+          value: o.id,
+        })),
+        { label: "✍️ Custom / Enter Manually", value: "manual" },
+      ];
+
+  const productOptions =
+    currentOrder && currentOrder.items?.length > 0
+      ? currentOrder.items.map((item, idx) => ({
+        label: item.title,
+        value: idx.toString(),
+      }))
+      : [];
+
   return (
-    <div className="reviora-page-wrapper">
-      <TitleBar title="Review Requests" />
-
-      {/* Direct Review Invitation Card */}
-      <div className="reviora-card">
-        <h2 style={{ fontSize: "16px", fontWeight: "600", margin: "0 0 4px 0", color: "#202223" }}>
-          Send Review Invitation by Order
-        </h2>
-        <p style={{ fontSize: "13px", color: "#6D7175", margin: "0 0 20px 0" }}>
-          Select or search delivered and fulfilled orders from your store to auto-fill customer and product info.
-        </p>
-
+    <Page>
+      <ui-title-bar title="Review Requests" />
+      <BlockStack gap="500">
+        {/* Banner Feedback */}
         {fetcher.data?.message && (
-          <div
-            style={{
-              padding: "10px 14px",
-              backgroundColor: "#E4F8F0",
-              color: "#007A5C",
-              borderRadius: "6px",
-              marginBottom: "16px",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              fontSize: "13px",
-              fontWeight: "500",
-            }}
-          >
-            <CheckCircle2 size={16} />
-            {fetcher.data.message}
-          </div>
+          <Banner tone="success" title="Success" onDismiss={() => { }}>
+            <p>{fetcher.data.message}</p>
+          </Banner>
         )}
 
         {(fetcher.data?.warning || fetcher.data?.error) && (
-          <div
-            style={{
-              padding: "10px 14px",
-              backgroundColor: "#FFF4E5",
-              color: "#9C4221",
-              borderRadius: "6px",
-              marginBottom: "16px",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              fontSize: "13px",
-              fontWeight: "500",
-            }}
-          >
-            <AlertCircle size={16} />
-            {fetcher.data.warning || fetcher.data.error}
-          </div>
+          <Banner tone="critical" title="Delivery Notice" onDismiss={() => { }}>
+            <p>{fetcher.data.warning || fetcher.data.error}</p>
+          </Banner>
         )}
 
-        {/* Search Controls for Fulfilled Orders */}
-        <div style={{ marginBottom: "16px" }}>
-          <form onSubmit={handleSearchSubmit}>
-            <div style={{ display: "flex", gap: "8px" }}>
-              <div style={{ position: "relative", flex: 1 }}>
-                <input
-                  id="orderSearch"
-                  type="text"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="Search delivered order #, customer name, or email..."
-                  className="reviora-input"
-                  style={{ paddingLeft: "32px" }}
-                />
-                <Search
-                  size={15}
-                  color="#8C9196"
-                  style={{
-                    position: "absolute",
-                    left: "10px",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                  }}
-                />
-              </div>
-              <button type="submit" className="reviora-btn reviora-btn-secondary">
-                Search
-              </button>
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={handleClearSearch}
-                  className="reviora-btn reviora-btn-secondary"
-                  title="Clear search"
-                >
-                  <X size={14} /> Clear
-                </button>
-              )}
-            </div>
-          </form>
-        </div>
+        {/* Section 1: Send Invitation by Order */}
+        <Card>
+          <BlockStack gap="400">
+            <BlockStack gap="100">
+              <Text as="h2" variant="headingMd">Send Review Invitation by Order</Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                Select or search delivered and fulfilled orders from your store to automatically populate customer and product details.
+              </Text>
+            </BlockStack>
 
-        <form onSubmit={handleSend}>
-          <input type="hidden" name="intent" value="send_manual" />
-          <input
-            type="hidden"
-            name="orderId"
-            value={orderNumber || `MANUAL-${Date.now()}`}
-          />
-          <input
-            type="hidden"
-            name="productTitle"
-            value={currentProduct ? currentProduct.title : manualProductTitle}
-          />
-          <input
-            type="hidden"
-            name="productId"
-            value={currentProduct ? currentProduct.productId : "custom-product"}
-          />
-          <input
-            type="hidden"
-            name="productHandle"
-            value={currentProduct ? currentProduct.productHandle : ""}
-          />
-
-          {/* Step 1: Select Order Dropdown */}
-          <div style={{ marginBottom: "18px" }}>
-            <label
-              htmlFor="orderSelect"
-              style={{
-                display: "block",
-                fontSize: "12px",
-                fontWeight: "600",
-                marginBottom: "6px",
-                color: "#202223",
-              }}
-            >
-              Select Order
-            </label>
-            <div style={{ position: "relative" }}>
-              <select
-                id="orderSelect"
-                value={selectedOrderId}
-                onChange={(e) => setSelectedOrderId(e.target.value)}
-                className="reviora-select"
-                style={{
-                  paddingLeft: "34px",
-                  fontWeight: "500",
-                  backgroundColor: "#FAFAFA",
-                }}
-              >
-                {orders.length === 0 ? (
-                  <option value="manual">
-                    {searchQuery
-                      ? `No orders matching "${searchQuery}" (Enter Manually)`
-                      : "No delivered orders found (Enter Manually)"}
-                  </option>
-                ) : (
-                  <>
-                    <optgroup label={`Delivered & Fulfilled Orders (${orders.length})`}>
-                      {orders.map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {o.orderNumber} — {o.customerName} ({o.customerEmail || "No email"}) •{" "}
-                          [{o.fulfillmentStatus}] • {o.items.length} item
-                          {o.items.length !== 1 ? "s" : ""}
-                        </option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="Other">
-                      <option value="manual">✍️ Custom / Enter Manually</option>
-                    </optgroup>
-                  </>
-                )}
-              </select>
-              <ShoppingBag
-                size={16}
-                color="#008060"
-                style={{
-                  position: "absolute",
-                  left: "10px",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                }}
+            {/* Order Search Bar */}
+            <InlineGrid columns={{ xs: 1, md: "1fr auto auto" }} gap="300" alignItems="end">
+              <TextField
+                label="Search Delivered Orders"
+                value={searchInput}
+                onChange={setSearchInput}
+                placeholder="Search order #, customer name, or email..."
+                autoComplete="off"
               />
-            </div>
-          </div>
+              <Button variant="secondary" onClick={handleSearchSubmit} loading={isSearching}>
+                Search
+              </Button>
+              {searchQuery && (
+                <Button variant="plain" onClick={handleClearSearch} disabled={isSearching}>
+                  Clear ({searchQuery})
+                </Button>
+              )}
+            </InlineGrid>
 
-          {/* Step 2: Auto-filled Customer Details & Product */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-              gap: "16px",
-              marginBottom: "20px",
-            }}
-          >
-            {/* Customer Name */}
-            <div>
-              <label
-                htmlFor="customerName"
-                style={{
-                  display: "block",
-                  fontSize: "12px",
-                  fontWeight: "600",
-                  marginBottom: "6px",
-                }}
-              >
-                Customer Name
-              </label>
-              <div style={{ position: "relative" }}>
-                <input
-                  id="customerName"
-                  type="text"
-                  name="customerName"
+            <Divider />
+
+            {/* Review Invitation Form */}
+            <BlockStack gap="400">
+              <Select
+                label="Select Delivered Order"
+                options={orderSelectOptions}
+                value={selectedOrderId}
+                onChange={setSelectedOrderId}
+              />
+
+              <InlineGrid columns={{ xs: 1, md: 3 }} gap="300">
+                <TextField
+                  label="Customer Name"
                   value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="e.g. Liam Walker"
-                  required
-                  className="reviora-input"
-                  style={{ paddingLeft: "32px" }}
+                  onChange={setCustomerName}
+                  autoComplete="name"
                 />
-                <User
-                  size={15}
-                  color="#8C9196"
-                  style={{
-                    position: "absolute",
-                    left: "10px",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                  }}
-                />
-              </div>
-            </div>
 
-            {/* Customer Email */}
-            <div>
-              <label
-                htmlFor="customerEmail"
-                style={{
-                  display: "block",
-                  fontSize: "12px",
-                  fontWeight: "600",
-                  marginBottom: "6px",
-                }}
-              >
-                Customer Email *
-              </label>
-              <div style={{ position: "relative" }}>
-                <input
-                  id="customerEmail"
+                <TextField
+                  label="Customer Email"
                   type="email"
-                  name="customerEmail"
                   value={customerEmail}
-                  onChange={(e) => setCustomerEmail(e.target.value)}
-                  placeholder="liam.w@example.com"
-                  required
-                  className="reviora-input"
-                  style={{ paddingLeft: "32px" }}
+                  onChange={setCustomerEmail}
+                  autoComplete="email"
                 />
-                <Mail
-                  size={15}
-                  color="#8C9196"
-                  style={{
-                    position: "absolute",
-                    left: "10px",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                  }}
-                />
-              </div>
-            </div>
 
-            {/* Purchased Product Selector */}
-            <div>
-              <label
-                htmlFor="productSelect"
-                style={{
-                  display: "block",
-                  fontSize: "12px",
-                  fontWeight: "600",
-                  marginBottom: "6px",
-                }}
-              >
-                Purchased Product
-              </label>
-              <div style={{ position: "relative" }}>
-                {currentOrder && currentOrder.items.length > 0 ? (
-                  <select
-                    id="productSelect"
-                    value={selectedProductIndex}
-                    onChange={(e) => setSelectedProductIndex(Number(e.target.value))}
-                    className="reviora-select"
-                    style={{ paddingLeft: "32px" }}
-                  >
-                    {currentOrder.items.map((item, idx) => (
-                      <option key={item.id} value={idx}>
-                        {item.title}
-                      </option>
-                    ))}
-                  </select>
+                {currentOrder && currentOrder.items && currentOrder.items.length > 0 ? (
+                  <Select
+                    label="Purchased Product"
+                    options={productOptions}
+                    value={selectedProductIndex.toString()}
+                    onChange={(val) => setSelectedProductIndex(Number(val))}
+                  />
                 ) : (
-                  <input
-                    id="productSelect"
-                    type="text"
+                  <TextField
+                    label="Purchased Product"
                     value={manualProductTitle}
-                    onChange={(e) => setManualProductTitle(e.target.value)}
+                    onChange={setManualProductTitle}
                     placeholder="e.g. The Complete Snowboard"
-                    required
-                    className="reviora-input"
-                    style={{ paddingLeft: "32px" }}
+                    autoComplete="off"
                   />
                 )}
-                <Package
-                  size={15}
-                  color="#8C9196"
-                  style={{
-                    position: "absolute",
-                    left: "10px",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                  }}
-                />
-              </div>
-            </div>
-          </div>
+              </InlineGrid>
 
-          <button
-            type="submit"
-            className="reviora-btn reviora-btn-primary"
-            disabled={isSending}
-            style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
-          >
-            <Send size={14} />
-            {isSending ? "Dispatching Email..." : "Send Review Invitation"}
-          </button>
-        </form>
-      </div>
-
-      {/* Requests History Log */}
-      <div className="reviora-card">
-        <h2 style={{ fontSize: "15px", fontWeight: "600", margin: "0 0 16px 0", color: "#202223" }}>
-          Delivery &amp; Activity Log
-        </h2>
-
-        {requests.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "32px 16px", color: "#6D7175" }}>
-            <p style={{ margin: "0 0 4px 0", fontSize: "14px", fontWeight: "500" }}>
-              No invitations sent yet
-            </p>
-            <p style={{ margin: 0, fontSize: "13px" }}>
-              Use the form above to send your first test invitation.
-            </p>
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            {requests.map((req) => (
-              <div
-                key={req.id}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "12px 16px",
-                  borderRadius: "6px",
-                  border: "1px solid #E1E3E5",
-                  backgroundColor: "#FAFAFA",
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: "14px", fontWeight: "600", color: "#202223" }}>
-                    {req.customerName || req.customerEmail}
-                  </div>
-                  <div style={{ fontSize: "12px", color: "#6D7175", marginTop: "2px" }}>
-                    Order: <strong>{req.orderId}</strong> • Product:{" "}
-                    <strong>{req.productTitle || req.productId}</strong> • Channel: {req.channel} •{" "}
-                    {new Date(req.createdAt).toLocaleString()}
-                  </div>
-                </div>
-
-                <span
-                  className={`reviora-badge-pill ${req.status === "SENT"
-                      ? "reviora-badge-success"
-                      : req.status === "FAILED"
-                        ? "reviora-badge-critical"
-                        : "reviora-badge-warning"
-                    }`}
+              <InlineStack>
+                <Button
+                  variant="primary"
+                  loading={isSending}
+                  disabled={!customerEmail.trim()}
+                  onClick={handleSend}
                 >
-                  {req.status}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+                  Send Review Invitation
+                </Button>
+              </InlineStack>
+            </BlockStack>
+          </BlockStack>
+        </Card>
+
+        {/* Section 2: Delivery & Activity Log */}
+        <Card>
+          <BlockStack gap="400">
+            <Text as="h2" variant="headingMd">Delivery &amp; Activity Log</Text>
+
+            {requests.length === 0 ? (
+              <Box padding="600">
+                <BlockStack gap="200" inlineAlign="center">
+                  <Text as="p" variant="headingSm" tone="subdued">
+                    No invitations sent yet
+                  </Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Use the form above to send your first customer review invitation.
+                  </Text>
+                </BlockStack>
+              </Box>
+            ) : (
+              <BlockStack gap="300">
+                {requests.map((req) => (
+                  <Box key={req.id} background="bg-surface-secondary" padding="300" borderRadius="200">
+                    <InlineStack align="space-between" blockAlign="center">
+                      <BlockStack gap="100">
+                        <Text as="span" variant="bodyMd" fontWeight="semibold">
+                          {req.customerName || req.customerEmail}
+                        </Text>
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          Order: <Text as="span" fontWeight="medium">{req.orderId}</Text> • Product:{" "}
+                          <Text as="span" fontWeight="medium">{req.productTitle || req.productId}</Text> • Channel:{" "}
+                          {req.channel} • {new Date(req.createdAt).toLocaleString()}
+                        </Text>
+                      </BlockStack>
+
+                      <Badge
+                        tone={
+                          req.status === "SENT"
+                            ? "success"
+                            : req.status === "FAILED"
+                              ? "critical"
+                              : "warning"
+                        }
+                      >
+                        {req.status}
+                      </Badge>
+                    </InlineStack>
+                  </Box>
+                ))}
+              </BlockStack>
+            )}
+          </BlockStack>
+        </Card>
+      </BlockStack>
+    </Page>
   );
 }
 
-export function ErrorBoundary() {
-  return (
-    <div className="reviora-page-wrapper">
-      <div className="reviora-card" style={{ borderColor: "#D72C0D", padding: "24px" }}>
-        <h2 style={{ color: "#D72C0D", fontSize: "16px", margin: "0 0 8px 0" }}>
-          Unable to load Review Requests
-        </h2>
-        <p style={{ color: "#6D7175", fontSize: "13px", margin: "0 0 16px 0" }}>
-          An error occurred while loading this page. Please refresh or try again.
-        </p>
-        <button
-          type="button"
-          onClick={() => window.location.reload()}
-          className="reviora-btn reviora-btn-secondary"
-        >
-          Refresh Page
-        </button>
-      </div>
-    </div>
-  );
-}
 
-export const headers = (headersArgs) => {
-  return boundary.headers(headersArgs);
-};

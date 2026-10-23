@@ -1,8 +1,8 @@
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
-import adminStyles from "./reviora-admin.css?url";
+import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
 export const links = () => [
-  { rel: "stylesheet", href: adminStyles },
+  { rel: "stylesheet", href: polarisStyles },
 ];
 
 export default function App() {

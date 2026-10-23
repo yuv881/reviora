@@ -1,200 +1,224 @@
+import { useState } from "react";
+import {
+  Card,
+  BlockStack,
+  InlineStack,
+  Badge,
+  Text,
+  ButtonGroup,
+  Button,
+  Divider,
+  Box,
+  Thumbnail,
+  Modal,
+} from "@shopify/polaris";
 import { StarRating } from "./StarRating.jsx";
-import { CheckCircle2, MessageSquare, Check, X, Sparkles, Trash2, Loader2 } from "lucide-react";
 
 /**
- * ReviewCard with Lucide icons and clean Stitch styling
+ * ReviewCard using native Shopify Polaris React components
  */
 export function ReviewCard({ review, onApprove, onReject, onReply, onDelete, isLoading, loadingIntent }) {
+  const [previewImage, setPreviewImage] = useState(null);
   const topics = review.topics ? JSON.parse(review.topics) : [];
 
-  let statusBadgeClass = "reviora-badge-info";
-  if (review.status === "PUBLISHED") statusBadgeClass = "reviora-badge-success";
-  if (review.status === "PENDING") statusBadgeClass = "reviora-badge-warning";
-  if (review.status === "FLAGGED" || review.status === "REJECTED") statusBadgeClass = "reviora-badge-critical";
+  let statusTone = "info";
+  if (review.status === "PUBLISHED") statusTone = "success";
+  if (review.status === "PENDING") statusTone = "warning";
+  if (review.status === "FLAGGED" || review.status === "REJECTED") statusTone = "critical";
 
-  let sentimentBadgeClass = "reviora-badge-info";
-  if (review.sentiment === "POSITIVE") sentimentBadgeClass = "reviora-badge-success";
-  if (review.sentiment === "NEGATIVE") sentimentBadgeClass = "reviora-badge-critical";
+  let sentimentTone = "info";
+  if (review.sentiment === "POSITIVE") sentimentTone = "success";
+  if (review.sentiment === "NEGATIVE") sentimentTone = "critical";
 
   return (
-    <div className="reviora-card" style={{ marginBottom: "16px" }}>
-      {/* Top Header Row */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-          <StarRating rating={review.rating} size={16} />
-          <h3 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#202223" }}>
-            {review.title || "Review"}
-          </h3>
-          {review.verified && (
-            <span className="reviora-badge-pill reviora-badge-success" style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
-              <CheckCircle2 size={12} color="#108043" />
-              Verified Buyer
-            </span>
+    <>
+      <Card>
+        <BlockStack gap="300">
+          {/* Top Header Row */}
+          <InlineStack align="space-between" blockAlign="center">
+            <InlineStack gap="200" blockAlign="center">
+              <StarRating rating={review.rating} size={15} />
+              <Text as="h3" variant="headingSm" fontWeight="semibold">
+                {review.title || "Customer Review"}
+              </Text>
+              {review.verified && <Badge tone="success">Verified Buyer</Badge>}
+            </InlineStack>
+
+            <InlineStack gap="150" blockAlign="center">
+              <Badge tone={statusTone}>{review.status}</Badge>
+              {review.sentiment && (
+                <Badge tone={sentimentTone}>{review.sentiment}</Badge>
+              )}
+            </InlineStack>
+          </InlineStack>
+
+          {/* Author and Product details */}
+          <Text as="p" variant="bodySm" tone="subdued">
+            By <Text as="span" fontWeight="semibold">{review.authorName}</Text> ({review.authorEmail})
+            {review.productTitle && ` • on ${review.productTitle}`}
+            {` • ${new Date(review.createdAt).toLocaleDateString()}`}
+          </Text>
+
+          {/* Review Body */}
+          <Text as="p" variant="bodyMd">
+            {review.body}
+          </Text>
+
+          {/* Attached Media */}
+          {review.media && review.media.length > 0 && (
+            <InlineStack gap="200">
+              {review.media.map((m) => (
+                <button
+                  key={m.id || m.url}
+                  type="button"
+                  onClick={() => setPreviewImage(m.url)}
+                  title="Click to view full photo"
+                  aria-label="Click to enlarge customer photo"
+                  style={{
+                    border: "1px solid #E1E3E5",
+                    background: "#FFFFFF",
+                    padding: "2px",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transition: "transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = "scale(1.06)";
+                    e.currentTarget.style.borderColor = "#008060";
+                    e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.12)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = "scale(1)";
+                    e.currentTarget.style.borderColor = "#E1E3E5";
+                    e.currentTarget.style.boxShadow = "none";
+                  }}
+                >
+                  <Thumbnail
+                    source={m.url}
+                    size="medium"
+                    alt="Customer upload"
+                  />
+                </button>
+              ))}
+            </InlineStack>
           )}
-        </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <span className={`reviora-badge-pill ${statusBadgeClass}`}>
-            {review.status}
-          </span>
-          {review.sentiment && (
-            <span className={`reviora-badge-pill ${sentimentBadgeClass}`} style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
-              <Sparkles size={11} />
-              {review.sentiment}
-            </span>
+          {/* Topics */}
+          {topics.length > 0 && (
+            <InlineStack gap="100">
+              {topics.map((t, idx) => (
+                <Badge key={idx} tone="info">
+                  {`#${t}`}
+                </Badge>
+              ))}
+            </InlineStack>
           )}
-        </div>
-      </div>
 
-      {/* Author and Product details */}
-      <div style={{ fontSize: "12px", color: "#6D7175", marginBottom: "12px" }}>
-        By <strong>{review.authorName}</strong> ({review.authorEmail})
-        {review.productTitle && (
-          <span> • on <em>{review.productTitle}</em></span>
-        )}
-        <span> • {new Date(review.createdAt).toLocaleDateString()}</span>
-      </div>
+          {/* Merchant Reply Section */}
+          {review.replies && review.replies.length > 0 && (
+            <Box background="bg-surface-secondary" padding="300" borderRadius="200">
+              <BlockStack gap="100">
+                <Text as="p" variant="bodySm" fontWeight="bold" tone="success">
+                  Store Owner Response:
+                </Text>
+                <Text as="p" variant="bodySm">
+                  {review.replies[0].body}
+                </Text>
+              </BlockStack>
+            </Box>
+          )}
 
-      {/* Review Body */}
-      <p style={{ fontSize: "14px", lineHeight: "1.6", color: "#202223", margin: "0 0 12px 0" }}>
-        {review.body}
-      </p>
+          {/* Actions Row */}
+          <Divider />
+          <InlineStack align="space-between" blockAlign="center">
+            <ButtonGroup>
+              {review.status !== "PUBLISHED" && (
+                <Button
+                  variant="primary"
+                  disabled={isLoading}
+                  loading={isLoading && loadingIntent === "publish"}
+                  onClick={() => onApprove(review.id)}
+                >
+                  Approve &amp; Publish
+                </Button>
+              )}
 
-      {/* Attached Media */}
-      {review.media && review.media.length > 0 && (
-        <div style={{ display: "flex", gap: "10px", marginBottom: "12px" }}>
-          {review.media.map((m) => (
-            <img
-              key={m.id}
-              src={m.url}
-              alt="Customer upload"
-              style={{
-                width: "72px",
-                height: "72px",
-                objectFit: "cover",
-                borderRadius: "6px",
-                border: "1px solid #E1E3E5",
-              }}
-            />
-          ))}
-        </div>
-      )}
+              {review.status !== "REJECTED" && (
+                <Button
+                  tone="critical"
+                  disabled={isLoading}
+                  loading={isLoading && loadingIntent === "reject"}
+                  onClick={() => onReject(review.id)}
+                >
+                  Reject
+                </Button>
+              )}
 
-      {/* Topics */}
-      {topics.length > 0 && (
-        <div style={{ display: "flex", gap: "6px", marginBottom: "12px" }}>
-          {topics.map((t, idx) => (
-            <span
-              key={idx}
-              style={{
-                backgroundColor: "#EEF2FF",
-                color: "#4338CA",
-                padding: "2px 8px",
-                borderRadius: "12px",
-                fontSize: "11px",
-                fontWeight: "500",
-              }}
-            >
-              #{t}
-            </span>
-          ))}
-        </div>
-      )}
+              <Button
+                variant="secondary"
+                onClick={() => onReply(review)}
+              >
+                Reply to Customer
+              </Button>
+            </ButtonGroup>
 
-      {/* Merchant Reply Section */}
-      {review.replies && review.replies.length > 0 && (
-        <div
-          style={{
-            backgroundColor: "#F6F6F7",
-            borderLeft: "3px solid #008060",
-            padding: "10px 14px",
-            borderRadius: "0 6px 6px 0",
-            marginBottom: "14px",
-            fontSize: "13px",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#202223", fontWeight: "600" }}>
-            <MessageSquare size={13} color="#008060" />
-            Store Owner Response:
-          </div>
-          <p style={{ margin: "4px 0 0 0", color: "#4B5563" }}>{review.replies[0].body}</p>
-        </div>
-      )}
-
-      {/* Actions Row */}
-      <div style={{ display: "flex", gap: "8px", alignItems: "center", borderTop: "1px solid #F1F2F4", paddingTop: "12px" }}>
-        {review.status !== "PUBLISHED" && (
-          <button
-            type="button"
-            disabled={isLoading}
-            className="reviora-btn reviora-btn-primary"
-            onClick={() => onApprove(review.id)}
-            style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
-          >
-            {isLoading && loadingIntent === "publish" ? (
-              <>
-                <Loader2 size={14} className="reviora-spin" />
-                Approving...
-              </>
-            ) : (
-              <>
-                <Check size={14} />
-                Approve &amp; Publish
-              </>
+            {onDelete && (
+              <Button
+                variant="plain"
+                tone="critical"
+                onClick={() => onDelete(review)}
+              >
+                Delete
+              </Button>
             )}
-          </button>
-        )}
+          </InlineStack>
+        </BlockStack>
+      </Card>
 
-        {review.status !== "REJECTED" && (
-          <button
-            type="button"
-            disabled={isLoading}
-            className="reviora-btn reviora-btn-critical"
-            onClick={() => onReject(review.id)}
-            style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
-          >
-            {isLoading && loadingIntent === "reject" ? (
-              <>
-                <Loader2 size={14} className="reviora-spin" />
-                Rejecting...
-              </>
-            ) : (
-              <>
-                <X size={14} />
-                Reject
-              </>
-            )}
-          </button>
-        )}
-
-        <button
-          type="button"
-          className="reviora-btn reviora-btn-secondary"
-          onClick={() => onReply(review)}
-          style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
-        >
-          <MessageSquare size={14} />
-          Reply to Customer
-        </button>
-
-        {onDelete && (
-          <button
-            type="button"
-            className="reviora-btn reviora-btn-plain"
-            onClick={() => onDelete(review.id)}
+      {/* Customer Photo Lightbox Modal */}
+      <Modal
+        open={Boolean(previewImage)}
+        onClose={() => setPreviewImage(null)}
+        title="Customer Photo"
+        secondaryActions={[
+          {
+            content: "Open original in new tab",
+            onAction: () => window.open(previewImage, "_blank", "noopener,noreferrer"),
+          },
+          {
+            content: "Close",
+            onAction: () => setPreviewImage(null),
+          },
+        ]}
+      >
+        <Modal.Section>
+          <div
             style={{
-              display: "inline-flex",
+              display: "flex",
+              justifyContent: "center",
               alignItems: "center",
-              gap: "6px",
-              color: "#D72C0D",
-              marginLeft: "auto",
+              backgroundColor: "#F6F6F7",
+              borderRadius: "8px",
+              padding: "16px",
             }}
           >
-            <Trash2 size={14} />
-            Delete
-          </button>
-        )}
-      </div>
-    </div>
+            <img
+              src={previewImage}
+              alt="Customer review attachment"
+              style={{
+                maxWidth: "100%",
+                maxHeight: "65vh",
+                borderRadius: "6px",
+                objectFit: "contain",
+                boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+              }}
+            />
+          </div>
+        </Modal.Section>
+      </Modal>
+    </>
   );
 }

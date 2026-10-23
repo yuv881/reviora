@@ -1,13 +1,14 @@
+import { InlineStack, Text } from "@shopify/polaris";
 import { Star } from "lucide-react";
 
 /**
- * Reusable StarRating component using Lucide icons
+ * StarRating component using Polaris InlineStack and Text
  */
 export function StarRating({ rating = 5, size = 16, showNumber = false }) {
   const fullStars = Math.max(0, Math.min(5, Math.round(rating)));
 
   return (
-    <div style={{ display: "inline-flex", alignItems: "center", gap: "2px" }}>
+    <InlineStack gap="050" blockAlign="center">
       {[1, 2, 3, 4, 5].map((i) => (
         <Star
           key={i}
@@ -18,10 +19,10 @@ export function StarRating({ rating = 5, size = 16, showNumber = false }) {
         />
       ))}
       {showNumber && (
-        <span style={{ fontSize: "13px", fontWeight: "600", marginLeft: "4px", color: "#202223" }}>
+        <Text as="span" variant="bodySm" fontWeight="semibold">
           {rating.toFixed(1)}
-        </span>
+        </Text>
       )}
-    </div>
+    </InlineStack>
   );
 }
