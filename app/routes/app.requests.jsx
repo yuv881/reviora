@@ -168,23 +168,20 @@ export default function RequestsPage() {
   const [searchInput, setSearchInput] = useState(searchQuery);
 
   // Selection states
-  const [selectedOrderId, setSelectedOrderId] = useState(
-    orders.length > 0 ? orders[0].id : "manual"
-  );
+  const [selectedOrderId, setSelectedOrderId] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [orderNumber, setOrderNumber] = useState("");
   const [selectedProductIndex, setSelectedProductIndex] = useState(0);
 
-  // Manual fallback input
-  const [manualProductTitle, setManualProductTitle] = useState("");
-
   const currentOrder = orders.find((o) => o.id === selectedOrderId);
 
   // Update selection if orders change
   useEffect(() => {
-    if (orders.length > 0 && !orders.some((o) => o.id === selectedOrderId)) {
-      setSelectedOrderId(orders[0].id);
+    if (orders.length > 0 && selectedOrderId && !orders.some((o) => o.id === selectedOrderId)) {
+      setSelectedOrderId("");
+    } else if (orders.length === 0) {
+      setSelectedOrderId("");
     }
   }, [orders, selectedOrderId]);
 
@@ -195,7 +192,7 @@ export default function RequestsPage() {
       setCustomerEmail(currentOrder.customerEmail || "");
       setOrderNumber(currentOrder.orderNumber || "");
       setSelectedProductIndex(0);
-    } else if (selectedOrderId === "manual") {
+    } else {
       setCustomerName("");
       setCustomerEmail("");
       setOrderNumber("");
@@ -218,13 +215,14 @@ export default function RequestsPage() {
   };
 
   const handleSend = () => {
+    if (!currentOrder || !currentProduct) return;
     fetcher.submit(
       {
         intent: "send_manual",
-        orderId: orderNumber || `MANUAL-${Date.now()}`,
-        productTitle: currentProduct ? currentProduct.title : manualProductTitle,
-        productId: currentProduct ? currentProduct.productId : "custom-product",
-        productHandle: currentProduct ? currentProduct.productHandle : "",
+        orderId: currentOrder.orderNumber || orderNumber,
+        productTitle: currentProduct.title,
+        productId: currentProduct.productId || "custom-product",
+        productHandle: currentProduct.productHandle || "",
         customerName,
         customerEmail,
       },
@@ -237,17 +235,18 @@ export default function RequestsPage() {
       ? [
         {
           label: searchQuery
-            ? `No delivered orders matching "${searchQuery}" (Enter Manually)`
-            : "No delivered orders found yet (Enter Manually)",
-          value: "manual",
+            ? `No delivered orders matching "${searchQuery}"`
+            : "No delivered orders found yet",
+          value: "",
+          disabled: true,
         },
       ]
       : [
+        { label: "Please select an order", value: "" },
         ...orders.map((o) => ({
           label: `${o.orderNumber} — ${o.customerName} (${o.customerEmail || "No email"}) • [${o.fulfillmentStatus}]`,
           value: o.id,
         })),
-        { label: "✍️ Custom / Enter Manually", value: "manual" },
       ];
 
   const productOptions =
@@ -313,6 +312,7 @@ export default function RequestsPage() {
                 options={orderSelectOptions}
                 value={selectedOrderId}
                 onChange={setSelectedOrderId}
+                disabled={orders.length === 0}
               />
 
               <InlineGrid columns={{ xs: 1, md: 3 }} gap="300">
@@ -321,6 +321,7 @@ export default function RequestsPage() {
                   value={customerName}
                   onChange={setCustomerName}
                   autoComplete="name"
+                  disabled={!currentOrder}
                 />
 
                 <TextField
@@ -329,6 +330,7 @@ export default function RequestsPage() {
                   value={customerEmail}
                   onChange={setCustomerEmail}
                   autoComplete="email"
+                  disabled={!currentOrder}
                 />
 
                 {currentOrder && currentOrder.items && currentOrder.items.length > 0 ? (
@@ -341,9 +343,9 @@ export default function RequestsPage() {
                 ) : (
                   <TextField
                     label="Purchased Product"
-                    value={manualProductTitle}
-                    onChange={setManualProductTitle}
-                    placeholder="e.g. The Complete Snowboard"
+                    value=""
+                    disabled
+                    placeholder="No product selected"
                     autoComplete="off"
                   />
                 )}
@@ -353,7 +355,7 @@ export default function RequestsPage() {
                 <Button
                   variant="primary"
                   loading={isSending}
-                  disabled={!customerEmail.trim()}
+                  disabled={!currentOrder || !currentProduct || !customerEmail.trim()}
                   onClick={handleSend}
                 >
                   Send Review Invitation

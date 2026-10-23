@@ -101,13 +101,9 @@ export default function ReviewsManagerPage() {
   // Automatically close modals when fetcher completes successfully
   useEffect(() => {
     if (fetcher.state === "idle" && fetcher.data?.success) {
-      if (reviewToDelete) {
-        setReviewToDelete(null);
-      }
-      if (selectedReviewForReply) {
-        setSelectedReviewForReply(null);
-        setReplyText("");
-      }
+      setReviewToDelete(null);
+      setSelectedReviewForReply(null);
+      setReplyText("");
     }
   }, [fetcher.state, fetcher.data]);
 

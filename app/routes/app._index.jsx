@@ -107,9 +107,9 @@ export default function DashboardPage() {
 
                   <InlineStack gap="300" blockAlign="center">
                     <Badge tone="info">Config</Badge>
-                    <Link to="/app/settings" style={{ textDecoration: "none" }}>
+                    <Link to="/app/widgets" style={{ textDecoration: "none" }}>
                       <Button variant="plain">
-                        Customize Star Colors &amp; Auto-Publish Rules →
+                        Manage &amp; Customize Storefront Widgets →
                       </Button>
                     </Link>
                   </InlineStack>
