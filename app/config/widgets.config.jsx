@@ -74,7 +74,7 @@ export const widgetsConfig = [
     hasInstall: true,
     blockName: "Star Rating Badge",
     template: "product",
-    snippet: (shop) =>
+    snippet: () =>
       `{% render 'stars', rating: product.metafields.reviora.avg_rating.value | default: 5 %}`,
     preview: {
       gradient: "linear-gradient(135deg, #7dd3fc 0%, #38bdf8 50%, #93c5fd 100%)",
@@ -114,7 +114,7 @@ export const widgetsConfig = [
     hasInstall: false,
     blockName: "Write a Review Form",
     template: "product",
-    snippet: (shop) =>
+    snippet: () =>
       `<reviora-write-review-button product-id="{{ product.id }}"></reviora-write-review-button>`,
     preview: {
       gradient: "linear-gradient(135deg, #bbf7d0 0%, #86efac 50%, #a7f3d0 100%)",
@@ -167,7 +167,7 @@ export const widgetsConfig = [
     hasInstall: true,
     blockName: "Reviora Cards Carousel",
     template: "index",
-    snippet: (shop) => `<reviora-reviews-carousel type="cards"></reviora-reviews-carousel>`,
+    snippet: () => `<reviora-reviews-carousel type="cards"></reviora-reviews-carousel>`,
     preview: {
       gradient: "linear-gradient(135deg, #86efac 0%, #4ade80 50%, #86efac 100%)",
       accentColor: "#059669",
@@ -212,7 +212,7 @@ export const widgetsConfig = [
     hasInstall: true,
     blockName: "Reviora Testimonials Carousel",
     template: "index",
-    snippet: (shop) => `<reviora-reviews-carousel type="testimonials"></reviora-reviews-carousel>`,
+    snippet: () => `<reviora-reviews-carousel type="testimonials"></reviora-reviews-carousel>`,
     preview: {
       gradient: "linear-gradient(135deg, #6ee7b7 0%, #34d399 50%, #6ee7b7 100%)",
       accentColor: "#0d9488",
@@ -253,7 +253,7 @@ export const widgetsConfig = [
     hasInstall: true,
     blockName: "Reviora Video Reels Widget",
     template: "index",
-    snippet: (shop) => `<reviora-reviews-carousel type="videos"></reviora-reviews-carousel>`,
+    snippet: () => `<reviora-reviews-carousel type="videos"></reviora-reviews-carousel>`,
     preview: {
       gradient: "linear-gradient(135deg, #60a5fa 0%, #3b82f6 50%, #93c5fd 100%)",
       accentColor: "#2563eb",
