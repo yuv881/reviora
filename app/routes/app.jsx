@@ -8,6 +8,23 @@ import { authenticate } from "../shopify.server";
 import { PageSkeleton } from "../components/PageSkeleton.jsx";
 
 export const loader = async ({ request }) => {
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, Accept",
+        "Access-Control-Max-Age": "86400",
+      },
+    });
+  }
+
+  const url = new URL(request.url);
+  if (url.pathname.startsWith("/app/api/")) {
+    return null;
+  }
+
   await authenticate.admin(request);
 
   // eslint-disable-next-line no-undef

@@ -100,6 +100,22 @@ export async function updateShopSettings(shop, data) {
   return updated.toObject({ virtuals: true });
 }
 
+/**
+ * Update widget-specific settings for a shop
+ */
+export async function updateWidgetSettings(shop, widgetId, widgetData) {
+  await connectDB();
+  const current = await getShopSettings(shop);
+  const updatedWidgets = {
+    ...(current?.widgetSettings || {}),
+    [widgetId]: {
+      ...((current?.widgetSettings && current.widgetSettings[widgetId]) || {}),
+      ...widgetData,
+    },
+  };
+  return updateShopSettings(shop, { widgetSettings: updatedWidgets });
+}
+
 
 /**
  * Fetch reviews for admin moderation with filters & pagination
@@ -193,14 +209,14 @@ export async function getDashboardMetrics(shop) {
 /**
  * Public storefront query for product reviews
  */
-export async function getStorefrontReviews(shop, productId, { sort = "newest", rating, hasMedia = false } = {}) {
+export async function getStorefrontReviews(shop, productId, { sort = "newest", rating, hasMedia = false, limit = null } = {}) {
   await connectDB();
   const storeDoc = await StoreReviews.findOne({ shop }).lean({ virtuals: true });
   const allReviews = storeDoc?.reviews || [];
 
-  // Filter for matching product and published status
+  // Filter for matching product and published status (supports all products if "all" or omitted)
   let matchingReviews = allReviews.filter(
-    (r) => String(r.productId) === String(productId) && r.status === "PUBLISHED"
+    (r) => (productId === "all" || !productId ? true : String(r.productId) === String(productId)) && r.status === "PUBLISHED"
   );
 
   // Calculate aggregates based on all published reviews for this product
@@ -238,12 +254,16 @@ export async function getStorefrontReviews(shop, productId, { sort = "newest", r
     matchingReviews.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }
 
-  const reviews = matchingReviews.map((r) => ({
+  let reviews = matchingReviews.map((r) => ({
     ...r,
     id: r.id || r._id?.toString(),
     media: (r.media || []).map((m) => ({ ...m, id: m.id || m._id?.toString() })),
     replies: (r.replies || []).map((rep) => ({ ...rep, id: rep.id || rep._id?.toString() })),
   }));
+
+  if (limit && Number(limit) > 0) {
+    reviews = reviews.slice(0, Number(limit));
+  }
 
   const settings = await getShopSettings(shop);
   const photoUploadsEnabled = settings.plan !== "FREE";
@@ -256,6 +276,11 @@ export async function getStorefrontReviews(shop, productId, { sort = "newest", r
       distribution,
       photoUploadsEnabled,
       plan: settings.plan,
+    },
+    settings: {
+      primaryColor: settings.primaryColor,
+      badgeColor: settings.badgeColor,
+      widgetSettings: settings.widgetSettings || {},
     },
   };
 }

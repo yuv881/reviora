@@ -24,20 +24,21 @@ export const loader = async ({ request }) => {
 
   const url = new URL(request.url);
   const shop = url.searchParams.get("shop");
-  const productId = url.searchParams.get("productId");
+  const productId = url.searchParams.get("productId") || "all";
   const sort = url.searchParams.get("sort") || "newest";
   const rating = url.searchParams.get("rating");
   const hasMedia = url.searchParams.get("hasMedia") === "true";
+  const limit = url.searchParams.get("limit") ? Number(url.searchParams.get("limit")) : null;
 
-  if (!shop || !productId) {
+  if (!shop) {
     return Response.json(
-      { error: "shop and productId query parameters are required" },
+      { error: "shop query parameter is required" },
       { status: 400, headers: CORS_HEADERS }
     );
   }
 
   try {
-    const data = await getStorefrontReviews(shop, productId, { sort, rating, hasMedia });
+    const data = await getStorefrontReviews(shop, productId, { sort, rating, hasMedia, limit });
     return Response.json(data, { headers: CORS_HEADERS });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500, headers: CORS_HEADERS });

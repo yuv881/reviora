@@ -15,6 +15,7 @@ const ShopSettingSchema = new mongoose.Schema(
     },
     enableAiFeatures: { type: Boolean, default: true },
     plan: { type: String, enum: ["FREE", "PRO"], default: "FREE" },
+    widgetSettings: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
   {
     timestamps: true,

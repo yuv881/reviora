@@ -1,25 +1,204 @@
 (() => {
+  // Global Lightbox Utility
+  class RevioraLightbox {
+    constructor() {
+      this.el = null;
+      this.currentIndex = 0;
+      this.mediaList = [];
+      this.init();
+    }
+
+    init() {
+      let existing = document.getElementById("reviora-global-lightbox");
+      if (existing) {
+        this.el = existing;
+        return;
+      }
+
+      const backdrop = document.createElement("div");
+      backdrop.id = "reviora-global-lightbox";
+      backdrop.className = "reviora-lightbox-backdrop is-hidden";
+      backdrop.innerHTML = `
+        <div class="reviora-lightbox-modal">
+          <button type="button" class="reviora-lightbox-close-btn" aria-label="Close lightbox">&times;</button>
+          <div class="reviora-lightbox-content">
+            <button type="button" class="reviora-lightbox-nav reviora-lightbox-prev" aria-label="Previous">&lsaquo;</button>
+            <div id="reviora-lightbox-media-container" style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;"></div>
+            <button type="button" class="reviora-lightbox-nav reviora-lightbox-next" aria-label="Next">&rsaquo;</button>
+          </div>
+          <div class="reviora-lightbox-caption" id="reviora-lightbox-caption">
+            <div id="reviora-lightbox-author" style="font-weight:600;"></div>
+            <div id="reviora-lightbox-counter" style="color:#94a3b8;font-size:12px;"></div>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(backdrop);
+      this.el = backdrop;
+
+      // Event listeners
+      backdrop.querySelector(".reviora-lightbox-close-btn").addEventListener("click", () => this.close());
+      backdrop.querySelector(".reviora-lightbox-prev").addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.prev();
+      });
+      backdrop.querySelector(".reviora-lightbox-next").addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.next();
+      });
+
+      backdrop.addEventListener("click", (e) => {
+        if (e.target === backdrop) this.close();
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (!this.el || this.el.classList.contains("is-hidden")) return;
+        if (e.key === "Escape") this.close();
+        if (e.key === "ArrowLeft") this.prev();
+        if (e.key === "ArrowRight") this.next();
+      });
+    }
+
+    open(mediaList, startIndex = 0, authorName = "") {
+      this.mediaList = mediaList || [];
+      this.currentIndex = startIndex >= 0 && startIndex < this.mediaList.length ? startIndex : 0;
+      this.authorName = authorName;
+      this.render();
+      this.el.classList.remove("is-hidden");
+      document.body.classList.add("reviora-modal-open");
+    }
+
+    close() {
+      if (this.el) {
+        this.el.classList.add("is-hidden");
+        const container = this.el.querySelector("#reviora-lightbox-media-container");
+        if (container) container.innerHTML = "";
+      }
+      document.body.classList.remove("reviora-modal-open");
+    }
+
+    prev() {
+      if (this.mediaList.length <= 1) return;
+      this.currentIndex = (this.currentIndex - 1 + this.mediaList.length) % this.mediaList.length;
+      this.render();
+    }
+
+    next() {
+      if (this.mediaList.length <= 1) return;
+      this.currentIndex = (this.currentIndex + 1) % this.mediaList.length;
+      this.render();
+    }
+
+    render() {
+      const container = this.el.querySelector("#reviora-lightbox-media-container");
+      const authorEl = this.el.querySelector("#reviora-lightbox-author");
+      const counterEl = this.el.querySelector("#reviora-lightbox-counter");
+      const prevBtn = this.el.querySelector(".reviora-lightbox-prev");
+      const nextBtn = this.el.querySelector(".reviora-lightbox-next");
+
+      if (this.mediaList.length <= 1) {
+        prevBtn.style.display = "none";
+        nextBtn.style.display = "none";
+      } else {
+        prevBtn.style.display = "flex";
+        nextBtn.style.display = "flex";
+      }
+
+      const item = this.mediaList[this.currentIndex];
+      if (!item) return;
+
+      const isVideo = item.mediaType === "VIDEO" || /\.(mp4|webm|mov|ogg)($|\?)/i.test(item.url);
+      if (isVideo) {
+        container.innerHTML = `<video src="${item.url}" class="reviora-lightbox-video" controls autoplay playsinline></video>`;
+      } else {
+        container.innerHTML = `<img src="${item.url}" class="reviora-lightbox-img" alt="Review Media" />`;
+      }
+
+      authorEl.textContent = this.authorName ? `Photo by ${this.authorName}` : "Customer Media";
+      counterEl.textContent = `${this.currentIndex + 1} of ${this.mediaList.length}`;
+    }
+  }
+
+  const globalLightbox = new RevioraLightbox();
+
+  // Helper: Render SVG Stars
+  function renderStarsSvg(rating, starColor = "#FFB800", size = 16) {
+    const fullStars = Math.floor(rating);
+    const hasHalf = rating - fullStars >= 0.5;
+    let html = `<div style="display:inline-flex;align-items:center;gap:2px;">`;
+
+    for (let i = 1; i <= 5; i++) {
+      let fill = "#E2E8F0";
+      if (i <= fullStars) {
+        fill = starColor;
+      } else if (i === fullStars + 1 && hasHalf) {
+        fill = starColor; // Or half star gradient
+      }
+      html += `
+        <svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="${fill}" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+        </svg>
+      `;
+    }
+    html += `</div>`;
+    return html;
+  }
+
+  // Helper: Sanitize API URL so inputs like /app or /api are stripped to the root domain origin
+  function cleanBaseUrl(raw) {
+    if (!raw || typeof raw !== "string") return "";
+    let trimmed = raw.trim().replace(/\/+$/, "");
+    try {
+      if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+        const u = new URL(trimmed);
+        return u.origin;
+      }
+    } catch {
+      // W`
+    }
+    return trimmed.replace(/\/app(\/api)?$/i, "").replace(/\/api$/i, "");
+  }
+
+  // =========================================================
+  // MAIN REVIEWS WIDGET CUSTOM ELEMENT
+  // =========================================================
   class RevioraReviewsWidget extends HTMLElement {
     constructor() {
       super();
-      this.shop = this.getAttribute("data-shop") || window.Shopify?.shop || window.location.hostname;
+      this.shop =
+        this.getAttribute("data-shop") ||
+        window.Shopify?.shop ||
+        (window.location.hostname.includes("myshopify.com") ? window.location.hostname : "");
       this.productId = this.getAttribute("data-product-id") || "";
       this.productTitle = this.getAttribute("data-product-title") || "";
       this.starColor = this.getAttribute("data-star-color") || "#FFB800";
-      this.apiUrl = (this.getAttribute("data-api-url") || "").trim().replace(/\/+$/, "");
-      this.selectedRating = 5;
+      this.accentColor = this.getAttribute("data-accent-color") || "#0F172A";
+      this.apiUrl =
+        cleanBaseUrl(this.getAttribute("data-api-url")) ||
+        window.RevioraApiUrl ||
+        "https://reviora-62qh.onrender.com";
+
+      // State
+      this.rawReviews = [];
+      this.filteredReviews = [];
+      this.stats = { total: 0, averageRating: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }, photoUploadsEnabled: true };
+      this.selectedFilterRating = null; // null for all, or 1..5
+      this.selectedFilterMedia = false;
+      this.searchKeyword = "";
+      this.sortOption = "newest";
       this.modalEl = null;
       this.currentStep = 1;
-      this.uploadedMedia = []; // [{ type: "PHOTO"|"VIDEO", url: string, name: string }]
-      this.photoUploadsEnabled = true; // default true, updated by API response
+      this.uploadedMedia = [];
+      this.photoUploadsEnabled = true;
     }
 
     connectedCallback() {
       const attrColor = this.getAttribute("data-star-color");
       if (attrColor && attrColor.trim() && attrColor !== "undefined") {
         this.starColor = attrColor.trim();
-      } else {
-        this.starColor = "#FFB800";
+      }
+      if (this.apiUrl) {
+        window.RevioraApiUrl = this.apiUrl;
       }
       this.renderLoading();
       this.fetchReviews();
@@ -35,24 +214,18 @@
 
     renderLoading() {
       this.innerHTML = `
-        <div class="reviora-widget-container">
-          <p class="reviora-loading-text">Loading verified customer reviews...</p>
+        <div class="reviora-widget-container" id="reviora-widget-container">
+          <div style="text-align:center;padding:40px;color:#64748b;font-size:14px;">
+            <div style="font-size:24px;margin-bottom:8px;">✨</div>
+            Loading verified customer reviews...
+          </div>
         </div>
       `;
     }
 
     async fetchReviews() {
       const shopParam = encodeURIComponent(this.shop || "");
-      const productParam = encodeURIComponent(this.productId || "");
-
-      if (!this.productId) {
-        this.render({
-          reviews: [],
-          stats: { total: 0, averageRating: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }, photoUploadsEnabled: true },
-        });
-        return;
-      }
-
+      const productParam = encodeURIComponent(this.productId || "all");
       const base = this.apiUrl || "";
       const endpoint = `${base}/api/reviews?shop=${shopParam}&productId=${productParam}`;
 
@@ -61,103 +234,171 @@
           headers: { Accept: "application/json" },
         });
 
-        if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
-        }
+        if (!res.ok) throw new Error(`HTTP error ${res.status}`);
 
         const data = await res.json();
-        this.photoUploadsEnabled = data.stats?.photoUploadsEnabled !== false;
-        this.render(data);
+        this.rawReviews = data.reviews || [];
+        this.stats = data.stats || { total: 0, averageRating: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } };
+        this.photoUploadsEnabled = this.stats.photoUploadsEnabled !== false;
+        this.applyFiltersAndSort();
+        this.render();
       } catch (e) {
-        console.warn("Reviora widget API unreachable, rendering interface fallback:", endpoint, e);
-        this.render({
-          reviews: [],
-          stats: { total: 0, averageRating: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }, photoUploadsEnabled: true },
-          isOffline: true,
-        });
+        console.warn("Reviora widget API fallback:", endpoint, e);
+        this.rawReviews = [];
+        this.stats = { total: 0, averageRating: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } };
+        this.applyFiltersAndSort();
+        this.render();
       }
     }
 
-    renderStars(rating) {
-      const rounded = Math.round(rating);
-      let stars = "";
-      for (let i = 1; i <= 5; i++) {
-        stars += `<span style="color:${i <= rounded ? this.starColor : '#E5E7EB'}">★</span>`;
+    applyFiltersAndSort() {
+      let list = [...this.rawReviews];
+
+      // Star rating filter
+      if (this.selectedFilterRating !== null) {
+        list = list.filter((r) => Math.round(Number(r.rating)) === this.selectedFilterRating);
       }
-      return stars;
+
+      // Media filter
+      if (this.selectedFilterMedia) {
+        list = list.filter((r) => r.media && r.media.length > 0);
+      }
+
+      // Search keyword filter
+      if (this.searchKeyword.trim()) {
+        const q = this.searchKeyword.trim().toLowerCase();
+        list = list.filter((r) => {
+          return (
+            (r.title && r.title.toLowerCase().includes(q)) ||
+            (r.body && r.body.toLowerCase().includes(q)) ||
+            (r.authorName && r.authorName.toLowerCase().includes(q))
+          );
+        });
+      }
+
+      // Sorting
+      if (this.sortOption === "highest") {
+        list.sort((a, b) => b.rating - a.rating);
+      } else if (this.sortOption === "lowest") {
+        list.sort((a, b) => a.rating - b.rating);
+      } else if (this.sortOption === "helpful") {
+        list.sort((a, b) => (b.helpfulCount || 0) - (a.helpfulCount || 0));
+      } else {
+        list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      }
+
+      this.filteredReviews = list;
     }
 
     getRatingLabel(rating) {
       switch (rating) {
-        case 5:
-          return "5 Stars — Loved it! Outstanding";
-        case 4:
-          return "4 Stars — Very Good";
-        case 3:
-          return "3 Stars — Average / It's OK";
-        case 2:
-          return "2 Stars — Not great / Disappointed";
-        case 1:
-          return "1 Star — Terrible experience";
-        default:
-          return `${rating} Stars`;
+        case 5: return "5 Stars — Loved it! Outstanding";
+        case 4: return "4 Stars — Very Good";
+        case 3: return "3 Stars — Average / It's OK";
+        case 2: return "2 Stars — Not great / Disappointed";
+        case 1: return "1 Star — Terrible experience";
+        default: return `${rating} Stars`;
       }
     }
 
-    renderMediaItem(m) {
-      const isVideo = m.mediaType === "VIDEO" || (m.url && /\.(mp4|webm|mov|ogg)($|\?)/i.test(m.url));
-      if (isVideo) {
-        return `<video src="${m.url}" class="reviora-media-img" controls playsinline preload="metadata"></video>`;
-      }
-      return `<a href="${m.url}" target="_blank" rel="noopener noreferrer" class="reviora-media-link" aria-label="Open review photo in new window"><img src="${m.url}" class="reviora-media-img" alt="Review photo" loading="lazy"></a>`;
+    renderMediaRow(review) {
+      if (!review.media || review.media.length === 0) return "";
+
+      const items = review.media.map((m, idx) => {
+        const isVideo = m.mediaType === "VIDEO" || (m.url && /\.(mp4|webm|mov|ogg)($|\?)/i.test(m.url));
+        return `
+          <div class="reviora-media-item" data-media-idx="${idx}" data-review-id="${review.id}">
+            ${isVideo
+            ? `<video src="${m.url}" class="reviora-media-thumb" preload="metadata"></video><div class="reviora-video-badge">▶</div>`
+            : `<img src="${m.url}" class="reviora-media-thumb" alt="Review photo" loading="lazy" />`
+          }
+          </div>
+        `;
+      }).join("");
+
+      return `<div class="reviora-media-row">${items}</div>`;
     }
 
     renderReviewCard(r) {
-      const mediaHtml = (r.media || []).map((m) => this.renderMediaItem(m)).join("");
+      const initials = (r.authorName || "Customer")
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase();
+
+      const dateStr = r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Recent";
+      const isHelpfulVoted = localStorage.getItem(`reviora_voted_${r.id}`) === "true";
+
       const replyHtml = r.replies && r.replies.length > 0
-        ? `<div class="reviora-reply-box"><strong>${r.replies[0].author || "Store Owner"}</strong><p>${r.replies[0].body}</p></div>`
+        ? `
+          <div class="reviora-reply-box">
+            <div class="reviora-reply-header">
+              <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14h2v2h-2zm0-10h2v8h-2z"/></svg>
+              Response from Store Owner
+            </div>
+            <p class="reviora-reply-body">${r.replies[0].body}</p>
+          </div>
+        `
         : "";
 
       return `
-        <div class="reviora-card">
+        <div class="reviora-card" data-review-id="${r.id}">
           <div class="reviora-card-top">
-            <div>
-              <span class="reviora-stars">${this.renderStars(r.rating)}</span>
-              <span class="reviora-author">${r.authorName}</span>
-              ${r.verified && r.authorEmail ? '<span class="reviora-badge">✓ Verified Buyer</span>' : ""}
+            <div class="reviora-author-meta">
+              <div class="reviora-avatar">${initials}</div>
+              <div class="reviora-author-details">
+                <div class="reviora-author-name-row">
+                  <span class="reviora-author">${r.authorName || "Verified Customer"}</span>
+                  ${r.verified ? `
+                    <span class="reviora-verified-badge">
+                      <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                      Verified Buyer
+                    </span>
+                  ` : ""}
+                </div>
+                <div class="reviora-card-stars-row">
+                  ${renderStarsSvg(r.rating, this.starColor, 15)}
+                </div>
+              </div>
             </div>
-            <div class="reviora-date">${new Date(r.createdAt).toLocaleDateString()}</div>
+            <span class="reviora-date">${dateStr}</span>
           </div>
-          ${r.title ? `<div class="reviora-card-title">${r.title}</div>` : ""}
+
+          ${r.title ? `<h3 class="reviora-card-title">${r.title}</h3>` : ""}
           <div class="reviora-card-body">${r.body}</div>
-          ${mediaHtml ? `<div class="reviora-media-row">${mediaHtml}</div>` : ""}
+
+          ${this.renderMediaRow(r)}
           ${replyHtml}
-          <div>
-            <button type="button" class="reviora-helpful-btn" data-review-id="${r.id}">
-              👍 Helpful (${r.helpfulCount || 0})
+
+          <div class="reviora-card-footer">
+            <button type="button" class="reviora-helpful-btn ${isHelpfulVoted ? 'is-voted' : ''}" data-review-id="${r.id}" ${isHelpfulVoted ? 'disabled' : ''}>
+              <svg viewBox="0 0 24 24"><path d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"/></svg>
+              <span>${isHelpfulVoted ? 'Helpful' : 'Helpful'} (${r.helpfulCount || 0})</span>
             </button>
           </div>
         </div>
       `;
     }
 
-    render(data) {
-      const stats = data.stats || { total: 0, averageRating: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } };
-      const reviews = data.reviews || [];
-
-      const dist = stats.distribution || {};
+    render() {
+      const stats = this.stats;
       const totalCount = Number(stats.total) || 0;
-      const fillColor = this.starColor || "#FFB800";
+      const avg = Number(stats.averageRating) || 0;
+      const dist = stats.distribution || {};
+      const reviews = this.filteredReviews;
 
+      // Distribution bars HTML with clickable filter
       const barsHtml = [5, 4, 3, 2, 1]
         .map((r) => {
           const count = Number(dist[r] || dist[String(r)] || 0);
           const pct = totalCount > 0 ? Math.round((count / totalCount) * 100) : 0;
+          const isActive = this.selectedFilterRating === r;
           return `
-            <div class="reviora-bar-row">
-              <span>${r}★</span>
+            <div class="reviora-bar-row ${isActive ? 'is-active' : ''}" data-filter-stars="${r}">
+              <span class="reviora-bar-star-label">${r}★</span>
               <div class="reviora-bar-track">
-                <div class="reviora-bar-fill" style="width: ${pct}% !important; background-color: ${fillColor} !important;"></div>
+                <div class="reviora-bar-fill" style="width: ${pct}%; background-color: ${this.starColor};"></div>
               </div>
               <span class="reviora-bar-count">${count}</span>
             </div>
@@ -165,38 +406,116 @@
         })
         .join("");
 
-      let reviewsListHtml = "";
-      if (reviews.length === 0) {
-        reviewsListHtml = `
-          <div class="reviora-empty-state">
-            <p class="reviora-empty-title">Be the first to review this product!</p>
-            <p class="reviora-empty-sub">Share your honest thoughts and help other shoppers make the best choice.</p>
-          </div>
-        `;
-      } else {
-        reviewsListHtml = reviews.map((r) => this.renderReviewCard(r)).join("");
+      // Filter pills
+      const mediaCount = this.rawReviews.filter((r) => r.media && r.media.length > 0).length;
+
+      // Active filter description
+      let activeFilterDesc = "";
+      if (this.selectedFilterRating !== null || this.selectedFilterMedia || this.searchKeyword) {
+        const parts = [];
+        if (this.selectedFilterRating !== null) parts.push(`${this.selectedFilterRating} Stars`);
+        if (this.selectedFilterMedia) parts.push("With Photos/Videos");
+        if (this.searchKeyword) parts.push(`"${this.searchKeyword}"`);
+        activeFilterDesc = `Showing ${reviews.length} reviews matching ${parts.join(" + ")}`;
       }
 
       this.innerHTML = `
-        <div class="reviora-widget-container">
+        <div class="reviora-widget-container" id="reviora-widget-container">
+          <!-- Summary Header -->
           <div class="reviora-header">
-            <h2 class="reviora-title">Customer Reviews</h2>
+            <div class="reviora-title-bar">
+              <h2 class="reviora-main-heading">
+                Customer Reviews
+                <span class="reviora-trust-pill">
+                  <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
+                  Verified Feedback
+                </span>
+              </h2>
+            </div>
+
             <div class="reviora-summary-grid">
               <div class="reviora-avg-box">
-                <div class="reviora-avg-number">${stats.averageRating.toFixed(1)}</div>
-                <div class="reviora-stars">${this.renderStars(stats.averageRating)}</div>
-                <div class="reviora-subtext">Based on ${stats.total} reviews</div>
+                <div class="reviora-avg-number">${avg > 0 ? avg.toFixed(1) : "0.0"}</div>
+                <div class="reviora-stars">${renderStarsSvg(avg, this.starColor, 20)}</div>
+                <div class="reviora-subtext">Based on ${totalCount} verified reviews</div>
               </div>
-              <div class="reviora-bars">${barsHtml}</div>
-              <div>
+
+              <div class="reviora-bars">
+                ${barsHtml}
+              </div>
+
+              <div class="reviora-cta-box">
                 <button type="button" class="reviora-write-btn" id="reviora-open-form-btn">
+                  <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
                   Write a Review
                 </button>
+                <span class="reviora-cta-caption">Takes only 30 seconds</span>
               </div>
             </div>
           </div>
 
-          <div class="reviora-list">${reviewsListHtml}</div>
+          <!-- Controls Bar: Filter Pills, Search, Sort -->
+          <div class="reviora-controls">
+            <div class="reviora-filter-group">
+              <button type="button" class="reviora-filter-pill ${this.selectedFilterRating === null && !this.selectedFilterMedia ? 'is-active' : ''}" data-filter="all">
+                All Reviews <span class="reviora-filter-count">(${totalCount})</span>
+              </button>
+              <button type="button" class="reviora-filter-pill ${this.selectedFilterMedia ? 'is-active' : ''}" data-filter="media">
+                📷 With Photos/Videos <span class="reviora-filter-count">(${mediaCount})</span>
+              </button>
+              ${[5, 4, 3, 2, 1].map((star) => {
+        const count = dist[star] || dist[String(star)] || 0;
+        return `
+                  <button type="button" class="reviora-filter-pill ${this.selectedFilterRating === star ? 'is-active' : ''}" data-filter="star-${star}">
+                    ${star} ★ <span class="reviora-filter-count">(${count})</span>
+                  </button>
+                `;
+      }).join("")}
+            </div>
+
+            <div class="reviora-search-sort-group">
+              <div class="reviora-search-wrap">
+                <svg class="reviora-search-icon" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                </svg>
+                <input
+                  type="text"
+                  class="reviora-search-input"
+                  id="reviora-search-input"
+                  placeholder="Search reviews..."
+                  value="${this.searchKeyword}"
+                />
+              </div>
+
+              <select class="reviora-sort-select" id="reviora-sort-select" aria-label="Sort Reviews">
+                <option value="newest" ${this.sortOption === "newest" ? "selected" : ""}>Most Recent</option>
+                <option value="highest" ${this.sortOption === "highest" ? "selected" : ""}>Highest Rating</option>
+                <option value="lowest" ${this.sortOption === "lowest" ? "selected" : ""}>Lowest Rating</option>
+                <option value="helpful" ${this.sortOption === "helpful" ? "selected" : ""}>Most Helpful</option>
+              </select>
+            </div>
+          </div>
+
+          ${activeFilterDesc ? `
+            <div class="reviora-active-filter-bar">
+              <span>${activeFilterDesc}</span>
+              <button type="button" class="reviora-clear-filters-btn" id="reviora-clear-filters-btn">Clear filters</button>
+            </div>
+          ` : ""}
+
+          <!-- Reviews List -->
+          <div class="reviora-list">
+            ${reviews.length === 0 ? `
+              <div class="reviora-empty-state">
+                <div class="reviora-empty-icon">💬</div>
+                <h3 class="reviora-empty-title">No reviews match your filter</h3>
+                <p class="reviora-empty-sub">Be the first to share your experience or reset your filters to see other feedback.</p>
+                <button type="button" class="reviora-write-btn" style="display:inline-flex;width:auto;" id="reviora-empty-open-form-btn">
+                  Write the First Review
+                </button>
+              </div>
+            ` : reviews.map((r) => this.renderReviewCard(r)).join("")}
+          </div>
         </div>
       `;
 
@@ -212,7 +531,6 @@
       const modalDiv = document.createElement("div");
       modalDiv.id = "reviora-modal";
       modalDiv.className = "reviora-modal-backdrop is-hidden";
-      modalDiv.style.display = "none";
       modalDiv.setAttribute("role", "dialog");
       modalDiv.setAttribute("aria-modal", "true");
 
@@ -221,108 +539,72 @@
           <div class="reviora-modal-header">
             <div class="reviora-modal-title-group">
               <h3>Write a Review</h3>
-              <p class="reviora-modal-subtitle">${this.productTitle ? 'for ' + this.productTitle : 'Share your experience with the community'}</p>
+              <p class="reviora-modal-subtitle">${this.productTitle ? 'for ' + this.productTitle : 'Share your verified experience'}</p>
             </div>
             <button type="button" id="reviora-close-form-btn" class="reviora-close-btn" aria-label="Close modal">&times;</button>
           </div>
 
           <div class="reviora-modal-body">
-            <!-- Step Indicator -->
             <div class="reviora-step-indicator">
               <div class="reviora-step-pill is-active" id="reviora-step-pill-1">
                 <span class="reviora-step-circle">1</span> Rating &amp; Review
               </div>
-              <span class="reviora-step-arrow">→</span>
+              <span class="reviora-step-arrow">&rarr;</span>
               <div class="reviora-step-pill" id="reviora-step-pill-2">
-                <span class="reviora-step-circle">2</span> Photos &amp; Video
+                <span class="reviora-step-circle">2</span> Photos &amp; Media
               </div>
             </div>
 
             <form id="reviora-submit-form">
-              <!-- STEP 1: REVIEW DETAILS -->
+              <!-- STEP 1: DETAILS -->
               <div id="reviora-step-1" class="reviora-step-panel">
-                <!-- Interactive Star Picker -->
                 <div class="reviora-star-picker-wrapper">
                   <span class="reviora-star-picker-label">Overall Rating</span>
                   <div class="reviora-interactive-stars" id="reviora-interactive-stars">
-                    <button type="button" class="reviora-star-btn" data-value="1" style="color: ${this.starColor};">★</button>
-                    <button type="button" class="reviora-star-btn" data-value="2" style="color: ${this.starColor};">★</button>
-                    <button type="button" class="reviora-star-btn" data-value="3" style="color: ${this.starColor};">★</button>
-                    <button type="button" class="reviora-star-btn" data-value="4" style="color: ${this.starColor};">★</button>
-                    <button type="button" class="reviora-star-btn" data-value="5" style="color: ${this.starColor};">★</button>
+                    ${[1, 2, 3, 4, 5].map((s) => `
+                      <button type="button" class="reviora-star-btn" data-value="${s}" style="color: ${this.starColor};">★</button>
+                    `).join("")}
                   </div>
                   <span class="reviora-star-text-badge" id="reviora-star-text-badge">${this.getRatingLabel(5)}</span>
                   <input type="hidden" id="reviora-form-rating" value="5" />
                 </div>
 
-                <!-- Review Headline -->
                 <div class="reviora-form-field">
                   <label class="reviora-form-label" for="reviora-form-title">Review Headline *</label>
-                  <input
-                    type="text"
-                    id="reviora-form-title"
-                    class="reviora-input"
-                    placeholder="e.g. Exceeded my expectations!"
-                    required
-                  />
+                  <input type="text" id="reviora-form-title" class="reviora-input" placeholder="e.g. Exceeded my expectations!" required />
                 </div>
 
-                <!-- Review Comments -->
                 <div class="reviora-form-field">
                   <label class="reviora-form-label" for="reviora-form-body">Review Comments *</label>
-                  <textarea
-                    id="reviora-form-body"
-                    class="reviora-textarea"
-                    rows="3"
-                    placeholder="What did you like or dislike? How was the fit and quality?"
-                    required
-                  ></textarea>
+                  <textarea id="reviora-form-body" class="reviora-textarea" rows="3" placeholder="What did you like or dislike? How was the fit and quality?" required></textarea>
                 </div>
 
-                <!-- Author Details -->
                 <div class="reviora-form-row">
                   <div class="reviora-form-field">
                     <label class="reviora-form-label" for="reviora-form-name">Your Public Name *</label>
-                    <input
-                      type="text"
-                      id="reviora-form-name"
-                      class="reviora-input"
-                      placeholder="e.g. Alex M."
-                      required
-                    />
+                    <input type="text" id="reviora-form-name" class="reviora-input" placeholder="e.g. Alex M." required />
                   </div>
                   <div class="reviora-form-field">
                     <label class="reviora-form-label" for="reviora-form-email">Your Email *</label>
-                    <input
-                      type="email"
-                      id="reviora-form-email"
-                      class="reviora-input"
-                      placeholder="alex@example.com"
-                      required
-                    />
+                    <input type="email" id="reviora-form-email" class="reviora-input" placeholder="alex@example.com" required />
                   </div>
                 </div>
 
-                <!-- Step 1 Controls -->
                 <div class="reviora-submit-row">
-                  <button type="button" class="reviora-cancel-btn" id="reviora-cancel-form-btn">
-                    Cancel
-                  </button>
+                  <button type="button" class="reviora-cancel-btn" id="reviora-cancel-form-btn">Cancel</button>
                   <button type="button" class="reviora-write-btn reviora-full-width" id="reviora-goto-step-2-btn">
-                    Continue to Photos →
+                    Continue to Photos &rarr;
                   </button>
                 </div>
               </div>
 
-              <!-- STEP 2: MEDIA UPLOADS (IF SUPPORTED) -->
-              <div id="reviora-step-2" class="reviora-step-panel" style="display: none;">
-                <div id="reviora-media-unsupported" style="display: none;">
+              <!-- STEP 2: MEDIA UPLOAD -->
+              <div id="reviora-step-2" class="reviora-step-panel" style="display:none;">
+                <div id="reviora-media-unsupported" style="display:none;">
                   <div class="reviora-plan-locked-box">
                     <span class="reviora-plan-locked-badge">Plan Notice</span>
                     <h4 class="reviora-plan-locked-title">Text Reviews Enabled</h4>
-                    <p class="reviora-plan-locked-desc">
-                      Photo &amp; video uploads are an exclusive feature of the Growth plan. Your written review will be submitted directly!
-                    </p>
+                    <p class="reviora-plan-locked-desc">Media uploads are disabled on this tier. Your written review will be submitted directly!</p>
                   </div>
                 </div>
 
@@ -334,16 +616,12 @@
                     <span class="reviora-dropzone-text">Click or drag images/videos here</span>
                     <span class="reviora-dropzone-sub">Supported formats: JPG, PNG, WEBP, MP4 (up to 3 files)</span>
                   </button>
-
-                  <!-- Uploaded Thumbnails Preview Grid -->
                   <div class="reviora-preview-grid" id="reviora-preview-grid"></div>
                 </div>
 
-                <!-- Step 2 Controls -->
                 <div class="reviora-submit-row">
-                  <button type="button" class="reviora-cancel-btn" id="reviora-back-to-step-1-btn">
-                    ← Back
-                  </button>
+                  <button type="button" class="reviora-cancel-btn" id="reviora-back-to-step-1-btn">&larr; Back</button>
+                  <button type="button" class="reviora-skip-btn" id="reviora-skip-media-btn">Skip</button>
                   <button type="submit" class="reviora-write-btn reviora-full-width" id="reviora-final-submit-btn">
                     Submit Review
                   </button>
@@ -351,25 +629,16 @@
               </div>
             </form>
 
-            <!-- STEP 3: SUCCESS CELEBRATION VIEW -->
+            <!-- SUCCESS VIEW -->
             <div id="reviora-step-success" class="reviora-success-view" style="display:none;">
               <div class="reviora-success-icon-wrap">
-                <div class="reviora-success-ring">
-                  <svg class="reviora-checkmark-svg" viewBox="0 0 24 24">
-                    <polyline points="20 6 9 17 4 12"></polyline>
-                  </svg>
-                </div>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
               </div>
               <h3 class="reviora-success-title">Review Submitted!</h3>
-              <p class="reviora-success-sub">Thank you for sharing your experience. Your feedback helps our community thrive.</p>
-              <div class="reviora-success-badge-row">
-                <span>✨ Verified Feedback</span>
-              </div>
-              <div>
-                <button type="button" class="reviora-write-btn reviora-full-width" id="reviora-success-done-btn">
-                  Done
-                </button>
-              </div>
+              <p class="reviora-success-sub">Thank you for sharing your experience. Your feedback helps our community make informed choices.</p>
+              <button type="button" class="reviora-write-btn reviora-full-width" id="reviora-success-done-btn">Done</button>
             </div>
           </div>
         </div>
@@ -380,262 +649,278 @@
     }
 
     attachEventListeners() {
-      const modal = this.modalEl;
+      // Open form button
+      const openForm = () => {
+        if (!this.modalEl) return;
+        this.modalEl.classList.remove("is-hidden");
+        this.modalEl.classList.add("is-active");
+        document.body.classList.add("reviora-modal-open");
+      };
+
+      const closeForm = () => {
+        if (!this.modalEl) return;
+        this.modalEl.classList.remove("is-active");
+        this.modalEl.classList.add("is-hidden");
+        document.body.classList.remove("reviora-modal-open");
+      };
+
       const openBtn = this.querySelector("#reviora-open-form-btn");
+      if (openBtn) openBtn.onclick = openForm;
+
+      const emptyOpenBtn = this.querySelector("#reviora-empty-open-form-btn");
+      if (emptyOpenBtn) emptyOpenBtn.onclick = openForm;
+
+      // Filter pills
+      this.querySelectorAll(".reviora-filter-pill").forEach((pill) => {
+        pill.onclick = () => {
+          const filter = pill.getAttribute("data-filter");
+          if (filter === "all") {
+            this.selectedFilterRating = null;
+            this.selectedFilterMedia = false;
+          } else if (filter === "media") {
+            this.selectedFilterMedia = !this.selectedFilterMedia;
+          } else if (filter.startsWith("star-")) {
+            const st = Number(filter.split("-")[1]);
+            this.selectedFilterRating = this.selectedFilterRating === st ? null : st;
+          }
+          this.applyFiltersAndSort();
+          this.render();
+        };
+      });
+
+      // Distribution bar rows click-to-filter
+      this.querySelectorAll(".reviora-bar-row").forEach((row) => {
+        row.onclick = () => {
+          const st = Number(row.getAttribute("data-filter-stars"));
+          this.selectedFilterRating = this.selectedFilterRating === st ? null : st;
+          this.applyFiltersAndSort();
+          this.render();
+        };
+      });
+
+      // Clear filters
+      const clearBtn = this.querySelector("#reviora-clear-filters-btn");
+      if (clearBtn) {
+        clearBtn.onclick = () => {
+          this.selectedFilterRating = null;
+          this.selectedFilterMedia = false;
+          this.searchKeyword = "";
+          this.applyFiltersAndSort();
+          this.render();
+        };
+      }
+
+      // Search input
+      const searchInput = this.querySelector("#reviora-search-input");
+      if (searchInput) {
+        let debounceTimer;
+        searchInput.oninput = (e) => {
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            this.searchKeyword = e.target.value;
+            this.applyFiltersAndSort();
+            this.render();
+          }, 250);
+        };
+      }
+
+      // Sort dropdown
+      const sortSelect = this.querySelector("#reviora-sort-select");
+      if (sortSelect) {
+        sortSelect.onchange = (e) => {
+          this.sortOption = e.target.value;
+          this.applyFiltersAndSort();
+          this.render();
+        };
+      }
+
+      // Media item click -> open Lightbox
+      this.querySelectorAll(".reviora-media-item").forEach((item) => {
+        item.onclick = (e) => {
+          e.stopPropagation();
+          const reviewId = item.getAttribute("data-review-id");
+          const idx = Number(item.getAttribute("data-media-idx") || 0);
+          const review = this.rawReviews.find((r) => String(r.id) === String(reviewId));
+          if (review && review.media && review.media.length > 0) {
+            globalLightbox.open(review.media, idx, review.authorName);
+          }
+        };
+      });
+
+      // Helpful vote button
+      this.querySelectorAll(".reviora-helpful-btn").forEach((btn) => {
+        btn.onclick = async () => {
+          const reviewId = btn.getAttribute("data-review-id");
+          if (!reviewId || localStorage.getItem(`reviora_voted_${reviewId}`)) return;
+
+          btn.disabled = true;
+          const base = this.apiUrl || "";
+          try {
+            const res = await fetch(`${base}/api/reviews/${reviewId}/vote`, { method: "POST" });
+            const result = await res.json();
+            if (result.success) {
+              localStorage.setItem(`reviora_voted_${reviewId}`, "true");
+              btn.classList.add("is-voted");
+              const span = btn.querySelector("span");
+              if (span) span.textContent = `Helpful (${result.helpfulCount})`;
+            }
+          } catch (e) {
+            console.error("Helpful vote error:", e);
+          }
+        };
+      });
+
+      // Modal internal logic
+      const modal = this.modalEl;
       if (!modal) return;
 
       const closeBtn = modal.querySelector("#reviora-close-form-btn");
+      if (closeBtn) closeBtn.onclick = closeForm;
       const cancelBtn = modal.querySelector("#reviora-cancel-form-btn");
-      const gotoStep2Btn = modal.querySelector("#reviora-goto-step-2-btn");
-      const backToStep1Btn = modal.querySelector("#reviora-back-to-step-1-btn");
+      if (cancelBtn) cancelBtn.onclick = closeForm;
+
+      modal.onclick = (e) => {
+        if (e.target === modal) closeForm();
+      };
+
       const step1Panel = modal.querySelector("#reviora-step-1");
       const step2Panel = modal.querySelector("#reviora-step-2");
+      const successPanel = modal.querySelector("#reviora-step-success");
       const stepPill1 = modal.querySelector("#reviora-step-pill-1");
       const stepPill2 = modal.querySelector("#reviora-step-pill-2");
-      const form = modal.querySelector("#reviora-submit-form");
-      const starRatingInput = modal.querySelector("#reviora-form-rating");
-      const starTextBadge = modal.querySelector("#reviora-star-text-badge");
-      const starButtons = modal.querySelectorAll(".reviora-star-btn");
-      const fileInput = modal.querySelector("#reviora-file-input");
-      const dropzone = modal.querySelector("#reviora-dropzone");
-      const previewGrid = modal.querySelector("#reviora-preview-grid");
-      const mediaSupportedBox = modal.querySelector("#reviora-media-supported");
-      const mediaUnsupportedBox = modal.querySelector("#reviora-media-unsupported");
-
-      const successPanel = modal.querySelector("#reviora-step-success");
       const stepIndicator = modal.querySelector(".reviora-step-indicator");
-      const doneBtn = modal.querySelector("#reviora-success-done-btn");
-
-      this.uploadedMedia = [];
+      const form = modal.querySelector("#reviora-submit-form");
 
       const setStep = (step) => {
         this.currentStep = step;
         if (step === 1) {
           form.style.display = "block";
-          if (stepIndicator) stepIndicator.style.display = "flex";
+          stepIndicator.style.display = "flex";
           step1Panel.style.display = "block";
           step2Panel.style.display = "none";
-          if (successPanel) successPanel.style.display = "none";
+          successPanel.style.display = "none";
           stepPill1.className = "reviora-step-pill is-active";
           stepPill2.className = "reviora-step-pill";
         } else if (step === 2) {
           form.style.display = "block";
-          if (stepIndicator) stepIndicator.style.display = "flex";
+          stepIndicator.style.display = "flex";
           step1Panel.style.display = "none";
           step2Panel.style.display = "block";
-          if (successPanel) successPanel.style.display = "none";
+          successPanel.style.display = "none";
           stepPill1.className = "reviora-step-pill is-done";
           stepPill2.className = "reviora-step-pill is-active";
 
-          // Check if plan supports media
+          const supp = modal.querySelector("#reviora-media-supported");
+          const unsupp = modal.querySelector("#reviora-media-unsupported");
           if (this.photoUploadsEnabled) {
-            mediaSupportedBox.style.display = "block";
-            mediaUnsupportedBox.style.display = "none";
+            supp.style.display = "block";
+            unsupp.style.display = "none";
           } else {
-            mediaSupportedBox.style.display = "none";
-            mediaUnsupportedBox.style.display = "block";
+            supp.style.display = "none";
+            unsupp.style.display = "block";
           }
         } else if (step === 3) {
-          // Success celebration step
           form.style.display = "none";
-          if (stepIndicator) stepIndicator.style.display = "none";
-          if (successPanel) successPanel.style.display = "block";
+          stepIndicator.style.display = "none";
+          successPanel.style.display = "block";
         }
       };
 
+      const gotoStep2Btn = modal.querySelector("#reviora-goto-step-2-btn");
+      if (gotoStep2Btn) {
+        gotoStep2Btn.onclick = () => {
+          const t = modal.querySelector("#reviora-form-title");
+          const b = modal.querySelector("#reviora-form-body");
+          const n = modal.querySelector("#reviora-form-name");
+          const e = modal.querySelector("#reviora-form-email");
+
+          if (!t.value.trim() || !b.value.trim() || !n.value.trim() || !e.value.trim()) {
+            t.reportValidity();
+            b.reportValidity();
+            n.reportValidity();
+            e.reportValidity();
+            return;
+          }
+          setStep(2);
+        };
+      }
+
+      const backBtn = modal.querySelector("#reviora-back-to-step-1-btn");
+      if (backBtn) backBtn.onclick = () => setStep(1);
+
+      const skipBtn = modal.querySelector("#reviora-skip-media-btn");
+      if (skipBtn) {
+        skipBtn.onclick = () => {
+          this.uploadedMedia = [];
+          if (form.requestSubmit) {
+            form.requestSubmit();
+          } else {
+            form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+          }
+        };
+      }
+
+      const doneBtn = modal.querySelector("#reviora-success-done-btn");
       if (doneBtn) {
         doneBtn.onclick = () => {
-          closeModal();
+          closeForm();
           form.reset();
           this.uploadedMedia = [];
           setStep(1);
         };
       }
 
-      const updateStarDisplay = (val) => {
-        starButtons.forEach((btn) => {
-          const btnVal = Number(btn.getAttribute("data-value"));
-          btn.style.color = btnVal <= val ? this.starColor : "#D1D5DB";
+      // Star picker
+      const starRatingInput = modal.querySelector("#reviora-form-rating");
+      const starTextBadge = modal.querySelector("#reviora-star-text-badge");
+      const starBtns = modal.querySelectorAll(".reviora-star-btn");
+
+      const updateStarButtons = (val) => {
+        starRatingInput.value = val;
+        starTextBadge.textContent = this.getRatingLabel(val);
+        starBtns.forEach((btn) => {
+          const bVal = Number(btn.getAttribute("data-value"));
+          btn.style.color = bVal <= val ? this.starColor : "#E2E8F0";
         });
-        if (starTextBadge) {
-          starTextBadge.innerText = this.getRatingLabel(val);
-        }
       };
 
-      starButtons.forEach((btn) => {
+      starBtns.forEach((btn) => {
         btn.onclick = () => {
           const val = Number(btn.getAttribute("data-value"));
-          this.selectedRating = val;
-          if (starRatingInput) starRatingInput.value = val;
-          updateStarDisplay(val);
-        };
-        btn.onmouseenter = () => {
-          const val = Number(btn.getAttribute("data-value"));
-          updateStarDisplay(val);
-        };
-        btn.onmouseleave = () => {
-          updateStarDisplay(this.selectedRating);
+          updateStarButtons(val);
         };
       });
 
-      const closeModal = (e) => {
-        if (e && typeof e.preventDefault === "function") {
-          e.preventDefault();
-          e.stopPropagation();
-        }
-        modal.classList.remove("is-active");
-        modal.classList.add("is-hidden");
-        modal.style.setProperty("display", "none", "important");
-        document.body.classList.remove("reviora-modal-open");
+      // Drag and drop file uploads
+      const dropzone = modal.querySelector("#reviora-dropzone");
+      const fileInput = modal.querySelector("#reviora-file-input");
+      const previewGrid = modal.querySelector("#reviora-preview-grid");
+
+      const renderPreviews = () => {
+        if (!previewGrid) return;
+        previewGrid.innerHTML = this.uploadedMedia
+          .map((m, idx) => `
+            <div class="reviora-preview-thumb">
+              ${m.type === "VIDEO" ? `<video src="${m.url}"></video>` : `<img src="${m.url}" alt="Preview" />`}
+              <button type="button" class="reviora-remove-thumb" data-idx="${idx}">&times;</button>
+            </div>
+          `)
+          .join("");
+
+        previewGrid.querySelectorAll(".reviora-remove-thumb").forEach((b) => {
+          b.onclick = (e) => {
+            e.stopPropagation();
+            const idx = Number(b.getAttribute("data-idx"));
+            this.uploadedMedia.splice(idx, 1);
+            renderPreviews();
+          };
+        });
       };
-
-      const openModal = (e) => {
-        if (e && typeof e.preventDefault === "function") {
-          e.preventDefault();
-          e.stopPropagation();
-        }
-        modal.classList.remove("is-hidden");
-        modal.classList.add("is-active");
-        modal.style.setProperty("display", "flex", "important");
-        document.body.classList.add("reviora-modal-open");
-        this.selectedRating = 5;
-        if (starRatingInput) starRatingInput.value = "5";
-        updateStarDisplay(5);
-        this.uploadedMedia = [];
-        renderPreviews();
-        setStep(1);
-      };
-
-      if (openBtn) openBtn.addEventListener("click", openModal);
-      if (closeBtn) closeBtn.addEventListener("click", closeModal);
-      if (cancelBtn) cancelBtn.addEventListener("click", closeModal);
-
-      // Helper to highlight a field with red border and inline error message
-      const showFieldError = (field, message) => {
-        if (!field) return;
-        field.classList.add("reviora-input-error");
-        let errEl = field.parentNode.querySelector(".reviora-error-msg");
-        if (!errEl) {
-          errEl = document.createElement("span");
-          errEl.className = "reviora-error-msg";
-          field.parentNode.appendChild(errEl);
-        }
-        errEl.innerText = message;
-      };
-
-      const clearFieldError = (field) => {
-        if (!field) return;
-        field.classList.remove("reviora-input-error");
-        const errEl = field.parentNode.querySelector(".reviora-error-msg");
-        if (errEl) {
-          errEl.remove();
-        }
-      };
-
-      const titleInput = modal.querySelector("#reviora-form-title");
-      const bodyInput = modal.querySelector("#reviora-form-body");
-      const nameInput = modal.querySelector("#reviora-form-name");
-      const emailInput = modal.querySelector("#reviora-form-email");
-
-      [titleInput, bodyInput, nameInput, emailInput].forEach((input) => {
-        if (input) {
-          input.addEventListener("input", () => clearFieldError(input));
-        }
-      });
-
-      // Validate Step 1 with red border highlights before proceeding to Step 2
-      if (gotoStep2Btn) {
-        gotoStep2Btn.onclick = () => {
-          let hasError = false;
-
-          const titleVal = (titleInput?.value || "").trim();
-          const bodyVal = (bodyInput?.value || "").trim();
-          const nameVal = (nameInput?.value || "").trim();
-          const emailVal = (emailInput?.value || "").trim();
-
-          if (!titleVal) {
-            showFieldError(titleInput, "Please enter a headline for your review.");
-            hasError = true;
-          } else {
-            clearFieldError(titleInput);
-          }
-
-          if (!bodyVal) {
-            showFieldError(bodyInput, "Please write your review feedback.");
-            hasError = true;
-          } else {
-            clearFieldError(bodyInput);
-          }
-
-          if (!nameVal) {
-            showFieldError(nameInput, "Please enter your name.");
-            hasError = true;
-          } else {
-            clearFieldError(nameInput);
-          }
-
-          if (!emailVal) {
-            showFieldError(emailInput, "Please enter your email.");
-            hasError = true;
-          } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
-            showFieldError(emailInput, "Please enter a valid email address.");
-            hasError = true;
-          } else {
-            clearFieldError(emailInput);
-          }
-
-          if (hasError) {
-            // Smoothly focus first erroneous field
-            const firstErr = modal.querySelector(".reviora-input-error");
-            if (firstErr) firstErr.focus();
-            return;
-          }
-
-          setStep(2);
-        };
-      }
-
-      if (backToStep1Btn) {
-        backToStep1Btn.onclick = () => {
-          setStep(1);
-        };
-      }
-
-      // Handle Dropzone & File Input
-      if (dropzone && fileInput) {
-        dropzone.onclick = () => fileInput.click();
-        dropzone.onkeydown = (e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            fileInput.click();
-          }
-        };
-
-        dropzone.ondragover = (e) => {
-          e.preventDefault();
-          dropzone.style.borderColor = "#008060";
-        };
-        dropzone.ondragleave = () => {
-          dropzone.style.borderColor = "#cbd5e1";
-        };
-        dropzone.ondrop = (e) => {
-          e.preventDefault();
-          dropzone.style.borderColor = "#cbd5e1";
-          if (e.dataTransfer.files) handleFiles(e.dataTransfer.files);
-        };
-
-        fileInput.onchange = () => {
-          if (fileInput.files) handleFiles(fileInput.files);
-        };
-      }
 
       const handleFiles = (files) => {
         if (!this.photoUploadsEnabled) return;
         Array.from(files).forEach((file) => {
-          if (this.uploadedMedia.length >= 3) {
-            showModalNotice("Maximum 3 files allowed per review.", true);
-            return;
-          }
+          if (this.uploadedMedia.length >= 3) return;
           const reader = new FileReader();
           reader.onload = (e) => {
             const isVideo = file.type.startsWith("video/");
@@ -650,68 +935,29 @@
         });
       };
 
-      const renderPreviews = () => {
-        if (!previewGrid) return;
-        previewGrid.innerHTML = this.uploadedMedia
-          .map((m, idx) => {
-            const mediaTag =
-              m.type === "VIDEO"
-                ? `<video src="${m.url}"></video>`
-                : `<img src="${m.url}" alt="Preview" />`;
-            return `
-              <div class="reviora-preview-thumb">
-                ${mediaTag}
-                <button type="button" class="reviora-remove-thumb" data-idx="${idx}">&times;</button>
-              </div>
-            `;
-          })
-          .join("");
+      if (dropzone && fileInput) {
+        dropzone.onclick = () => fileInput.click();
+        dropzone.ondragover = (e) => e.preventDefault();
+        dropzone.ondrop = (e) => {
+          e.preventDefault();
+          if (e.dataTransfer.files) handleFiles(e.dataTransfer.files);
+        };
+        fileInput.onchange = () => {
+          if (fileInput.files) handleFiles(fileInput.files);
+        };
+      }
 
-        previewGrid.querySelectorAll(".reviora-remove-thumb").forEach((btn) => {
-          btn.onclick = (e) => {
-            e.stopPropagation();
-            const idx = Number(btn.getAttribute("data-idx"));
-            this.uploadedMedia.splice(idx, 1);
-            renderPreviews();
-          };
-        });
-      };
-
-      modal.addEventListener("click", (e) => {
-        if (e.target === modal) {
-          closeModal(e);
-        }
-      });
-
-      document.addEventListener("keydown", (e) => {
-        if (e.key === "Escape" && modal && modal.style.display !== "none") {
-          closeModal(e);
-        }
-      });
-
-      const showModalNotice = (msg, isError = true) => {
-        let banner = modal.querySelector(".reviora-toast-banner");
-        if (!banner) {
-          banner = document.createElement("div");
-          banner.className = "reviora-toast-banner";
-          const bodyEl = modal.querySelector(".reviora-modal-body");
-          bodyEl.insertBefore(banner, bodyEl.firstChild);
-        }
-        banner.style.background = isError ? "#fef2f2" : "#f0fdf4";
-        banner.style.borderColor = isError ? "#fecaca" : "#bbf7d0";
-        banner.style.color = isError ? "#991b1b" : "#166534";
-        banner.innerText = msg;
-        setTimeout(() => {
-          if (banner && banner.parentNode) banner.remove();
-        }, 5000);
-      };
-
+      // Form submission
       if (form) {
         form.onsubmit = async (e) => {
           e.preventDefault();
           const submitBtn = modal.querySelector("#reviora-final-submit-btn");
-          submitBtn.disabled = true;
-          submitBtn.innerText = "Submitting Review...";
+          const skipBtnEl = modal.querySelector("#reviora-skip-media-btn");
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Submitting Review...";
+          }
+          if (skipBtnEl) skipBtnEl.disabled = true;
 
           const payload = {
             shop: this.shop,
@@ -737,46 +983,415 @@
               setStep(3);
               this.fetchReviews();
               setTimeout(() => {
-                closeModal();
+                closeForm();
                 form.reset();
                 this.uploadedMedia = [];
                 setStep(1);
               }, 4000);
             } else {
-              const err = await res.json().catch(() => ({}));
-              showModalNotice(err.error || "Could not submit review. Please try again.");
+              alert("Could not submit review. Please try again.");
             }
           } catch {
-            showModalNotice("Network error submitting review. Please try again.");
+            alert("Network error submitting review.");
           } finally {
-            submitBtn.disabled = false;
-            submitBtn.innerText = "Submit Review";
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.textContent = "Submit Review";
+            }
+            if (skipBtnEl) skipBtnEl.disabled = false;
           }
         };
       }
-
-      this.querySelectorAll(".reviora-helpful-btn").forEach((btn) => {
-        btn.onclick = async () => {
-          const reviewId = btn.getAttribute("data-review-id");
-          if (!reviewId) return;
-
-          btn.disabled = true;
-          const base = this.apiUrl || "";
-          try {
-            const res = await fetch(`${base}/api/reviews/${reviewId}/vote`, { method: "POST" });
-            const result = await res.json();
-            if (result.success) {
-              btn.innerText = `👍 Helpful (${result.helpfulCount})`;
-            }
-          } catch (e) {
-            console.error("Helpful vote failed:", e);
-          }
-        };
-      });
     }
   }
 
   if (!customElements.get("reviora-reviews-widget")) {
     customElements.define("reviora-reviews-widget", RevioraReviewsWidget);
+  }
+
+  // =========================================================
+  // CAROUSEL COMPONENT (<reviora-reviews-carousel>)
+  // Supports type="cards" | "testimonials" | "videos"
+  // =========================================================
+  // Demo items displayed when merchant is customizing in Shopify Theme Editor or when 0 reviews exist
+  const DEMO_VIDEO_REELS = [
+    {
+      authorName: "Sarah M.",
+      rating: 5,
+      productTitle: "Allemano - Collection 1919",
+      verified: true,
+      media: [
+        {
+          mediaType: "IMAGE",
+          url: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80",
+        },
+      ],
+    },
+    {
+      authorName: "Marcus V.",
+      rating: 5,
+      productTitle: "Collection 1973 - Shark",
+      verified: true,
+      media: [
+        {
+          mediaType: "IMAGE",
+          url: "https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=600&auto=format&fit=crop&q=80",
+        },
+      ],
+    },
+    {
+      authorName: "Jessica T.",
+      rating: 5,
+      productTitle: "Shark & Crab Chrono",
+      verified: true,
+      media: [
+        {
+          mediaType: "IMAGE",
+          url: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&auto=format&fit=crop&q=80",
+        },
+      ],
+    },
+    {
+      authorName: "David K.",
+      rating: 5,
+      productTitle: "Nautoscaph - All Red",
+      verified: true,
+      media: [
+        {
+          mediaType: "IMAGE",
+          url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80",
+        },
+      ],
+    },
+  ];
+
+  const DEMO_TESTIMONIALS = [
+    {
+      authorName: "Emma Watson",
+      rating: 5,
+      body: "The quality exceeded my expectations. Fast shipping and the customer service was phenomenal!",
+      verified: true,
+    },
+    {
+      authorName: "Liam Johnson",
+      rating: 5,
+      body: "Unbelievable craftsmanship. I get compliments everywhere I go. Highly recommend!",
+      verified: true,
+    },
+    {
+      authorName: "Sophia Davis",
+      rating: 5,
+      body: "Best purchase I've made all year. The attention to detail is noticeable the moment you open the box.",
+      verified: true,
+    },
+  ];
+
+  const DEMO_CARDS = [
+    {
+      authorName: "Michael Brown",
+      rating: 5,
+      title: "Exceptional Quality",
+      body: "Arrived quickly and in pristine condition. Exactly what I was looking for!",
+      productTitle: "Classic Collection",
+      verified: true,
+    },
+    {
+      authorName: "Olivia Wilson",
+      rating: 5,
+      title: "Highly Recommend!",
+      body: "Super satisfied with the entire experience. Will definitely be buying again soon.",
+      productTitle: "Signature Item",
+      verified: true,
+    },
+    {
+      authorName: "James Taylor",
+      rating: 5,
+      title: "Worth Every Penny",
+      body: "Great value for money. Build quality is sturdy and feels truly premium.",
+      productTitle: "Essential Series",
+      verified: true,
+    },
+  ];
+
+  class RevioraReviewsCarousel extends HTMLElement {
+    constructor() {
+      super();
+      this.type = this.getAttribute("type") || "cards";
+      this.shop =
+        this.getAttribute("data-shop") ||
+        window.Shopify?.shop ||
+        (window.location.hostname.includes("myshopify.com") ? window.location.hostname : "");
+      this.productId = this.getAttribute("data-product-id") || "all";
+      this.heading = this.getAttribute("data-heading") || "Customer Reviews";
+      this.subheading = this.getAttribute("data-subheading") || "Real stories from our community";
+      this.starColor = this.getAttribute("data-star-color") || "#FFB800";
+      this.limit = Number(this.getAttribute("data-limit")) || 8;
+      this.autoplay = this.getAttribute("data-autoplay") === "true";
+      this.apiUrl =
+        cleanBaseUrl(this.getAttribute("data-api-url")) ||
+        window.RevioraApiUrl ||
+        "https://reviora-62qh.onrender.com";
+      this.reviews = [];
+      this.autoplayTimer = null;
+    }
+
+    connectedCallback() {
+      // Refresh attributes from block settings
+      this.type = this.getAttribute("type") || this.type || "cards";
+      this.heading = this.getAttribute("data-heading") || this.heading || "Customer Reviews";
+      this.subheading = this.getAttribute("data-subheading") || this.subheading || "";
+      this.starColor = this.getAttribute("data-star-color") || this.starColor || "#FFB800";
+      this.limit = Number(this.getAttribute("data-limit")) || this.limit || 8;
+      this.autoplay = this.getAttribute("data-autoplay") === "true";
+      const customApi = this.getAttribute("data-api-url");
+      if (customApi) {
+        this.apiUrl = cleanBaseUrl(customApi);
+      }
+
+      // Check if we are inside the Shopify Theme Editor
+      const isThemeEditor = Boolean(
+        (window.Shopify && window.Shopify.designMode) ||
+        document.body.classList.contains("shopify-design-mode") ||
+        document.querySelector(".shopify-section") ||
+        window.location.search.includes("shopify-editor") ||
+        window.self !== window.top
+      );
+
+      // Render immediately with preview in Theme Editor
+      if (isThemeEditor) {
+        this.render();
+      }
+
+      this.fetchCarouselData();
+    }
+
+    disconnectedCallback() {
+      if (this.autoplayTimer) clearInterval(this.autoplayTimer);
+    }
+
+    async fetchCarouselData() {
+      const shopParam = encodeURIComponent(this.shop || "");
+      const productParam = encodeURIComponent(this.productId || "all");
+      const base = this.apiUrl || "https://reviora-62qh.onrender.com";
+      const endpoint = `${base}/api/reviews?shop=${shopParam}&productId=${productParam}&limit=${this.limit}`;
+
+      try {
+        const res = await fetch(endpoint, { headers: { Accept: "application/json" } });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.reviews && data.reviews.length > 0) {
+            this.reviews = data.reviews;
+          }
+        }
+      } catch (e) {
+        console.warn("Carousel API fallback:", e);
+      }
+
+      this.render();
+    }
+
+    render() {
+      const isThemeEditor = Boolean(
+        (window.Shopify && window.Shopify.designMode) ||
+        document.body.classList.contains("shopify-design-mode") ||
+        document.querySelector(".shopify-section") ||
+        window.location.search.includes("shopify-editor") ||
+        window.self !== window.top
+      );
+
+      let targetList = [];
+      let isDemoMode = false;
+
+      if (this.type === "videos") {
+        const videoReviews = (this.reviews || []).filter(
+          (r) => r.media && r.media.some((m) => m.mediaType === "VIDEO" || /\.(mp4|webm)($|\?)/i.test(m.url))
+        );
+        targetList = videoReviews.length > 0 ? videoReviews : (this.reviews || []);
+      } else {
+        targetList = this.reviews || [];
+      }
+
+      // If no customer reviews exist yet:
+      if (!targetList || targetList.length === 0) {
+        if (isThemeEditor) {
+          isDemoMode = true;
+          if (this.type === "videos") {
+            targetList = DEMO_VIDEO_REELS;
+          } else if (this.type === "testimonials") {
+            targetList = DEMO_TESTIMONIALS;
+          } else {
+            targetList = DEMO_CARDS;
+          }
+        } else {
+          // On live storefront with 0 reviews
+          this.innerHTML = "";
+          return;
+        }
+      }
+
+      let slidesHtml = "";
+      if (this.type === "testimonials") {
+        slidesHtml = targetList.map((r) => `
+          <div class="reviora-testimonial-slide">
+            <div class="reviora-testimonial-quote-icon">&ldquo;</div>
+            <p class="reviora-testimonial-text">"${r.body}"</p>
+            <div style="margin-bottom:8px;">${renderStarsSvg(r.rating, this.starColor, 15)}</div>
+            <div style="font-weight:700;font-size:14px;color:#0f172a;">${r.authorName}</div>
+            ${r.verified ? `
+              <span class="reviora-verified-badge" style="margin-top:4px;">
+                <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                Verified Buyer
+              </span>
+            ` : ""}
+          </div>
+        `).join("");
+      } else if (this.type === "videos") {
+        slidesHtml = targetList.map((r, idx) => {
+          const media = r.media && r.media.length > 0 ? r.media[0] : null;
+          const isVideo = media && (media.mediaType === "VIDEO" || /\.(mp4|webm)($|\?)/i.test(media.url));
+          return `
+            <div class="reviora-video-reel-slide" data-idx="${idx}">
+              ${media ? (
+              isVideo
+                ? `<video src="${media.url}" ${media.poster ? `poster="${media.poster}"` : ""} class="reviora-video-reel-media" preload="metadata" muted playsinline></video>`
+                : `<img src="${media.url}" class="reviora-video-reel-media" alt="Review media" />`
+            ) : `
+                <div style="width:100%;height:100%;background:linear-gradient(135deg,#1e293b,#0f172a);display:flex;align-items:center;justify-content:center;color:#fff;font-size:32px;">★</div>
+              `}
+              <div class="reviora-video-reel-overlay">
+                <div class="reviora-reel-play-btn">▶</div>
+                <div class="reviora-reel-meta">
+                  <div class="reviora-reel-author">${r.authorName}</div>
+                  <div class="reviora-reel-stars">${renderStarsSvg(r.rating, this.starColor, 13)}</div>
+                  ${r.productTitle ? `<div style="font-size:10px;opacity:0.85;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.productTitle}</div>` : ""}
+                </div>
+              </div>
+            </div>
+          `;
+        }).join("");
+      } else {
+        // Standard Cards Carousel
+        slidesHtml = targetList.map((r) => {
+          const initials = (r.authorName || "C").slice(0, 2).toUpperCase();
+          return `
+            <div class="reviora-carousel-card">
+              <div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <div class="reviora-avatar" style="width:32px;height:32px;font-size:12px;">${initials}</div>
+                    <div>
+                      <div style="font-weight:700;font-size:13px;color:#0f172a;">${r.authorName}</div>
+                      ${r.verified ? `
+                        <span class="reviora-verified-badge" style="font-size:10px;padding:1px 5px;">
+                          <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                          Verified
+                        </span>
+                      ` : ""}
+                    </div>
+                  </div>
+                  <div>${renderStarsSvg(r.rating, this.starColor, 13)}</div>
+                </div>
+
+                ${r.title ? `<div style="font-weight:700;font-size:14px;color:#0f172a;margin-bottom:6px;">${r.title}</div>` : ""}
+                <div style="font-size:13px;line-height:1.5;color:#475569;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">
+                  ${r.body || ""}
+                </div>
+              </div>
+
+              ${r.productTitle ? `
+                <div class="reviora-card-product-tag">
+                  <span>🛍️</span>
+                  <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;">${r.productTitle}</span>
+                </div>
+              ` : ""}
+            </div>
+          `;
+        }).join("");
+      }
+
+      const demoNoticeHtml = isDemoMode
+        ? `
+          <div style="text-align:center;margin-top:12px;">
+            <span style="font-size:11px;color:#059669;background:#ecfdf5;border:1px solid #a7f3d0;padding:4px 12px;border-radius:12px;display:inline-block;font-weight:600;">
+              ✨ Theme Editor Preview • Real customer videos will display here once collected
+            </span>
+          </div>
+        `
+        : "";
+
+      this.innerHTML = `
+        <div class="reviora-carousel-block">
+          <div class="reviora-carousel-header">
+            <h2 class="reviora-carousel-title">${this.heading}</h2>
+            ${this.subheading ? `<p class="reviora-carousel-sub">${this.subheading}</p>` : ""}
+            ${demoNoticeHtml}
+          </div>
+
+          <div class="reviora-carousel-track-wrap">
+            <button type="button" class="reviora-carousel-nav-btn reviora-carousel-prev" aria-label="Previous">&lsaquo;</button>
+            <div class="reviora-carousel-track" id="reviora-carousel-track">
+              ${slidesHtml}
+            </div>
+            <button type="button" class="reviora-carousel-nav-btn reviora-carousel-next" aria-label="Next">&rsaquo;</button>
+          </div>
+        </div>
+      `;
+
+      this.attachCarouselEvents();
+    }
+
+    attachCarouselEvents() {
+      const track = this.querySelector("#reviora-carousel-track");
+      const prevBtn = this.querySelector(".reviora-carousel-prev");
+      const nextBtn = this.querySelector(".reviora-carousel-next");
+      if (!track) return;
+
+      const scrollAmount = 320;
+      if (prevBtn) {
+        prevBtn.onclick = () => track.scrollBy({ left: -scrollAmount, behavior: "smooth" });
+      }
+      if (nextBtn) {
+        nextBtn.onclick = () => track.scrollBy({ left: scrollAmount, behavior: "smooth" });
+      }
+
+      // Autoplay if configured
+      if (this.autoplay) {
+        this.autoplayTimer = setInterval(() => {
+          if (track.scrollLeft + track.clientWidth >= track.scrollWidth - 10) {
+            track.scrollTo({ left: 0, behavior: "smooth" });
+          } else {
+            track.scrollBy({ left: scrollAmount, behavior: "smooth" });
+          }
+        }, 5000);
+
+        track.addEventListener("mouseenter", () => clearInterval(this.autoplayTimer));
+        track.addEventListener("mouseleave", () => {
+          this.autoplayTimer = setInterval(() => {
+            if (track.scrollLeft + track.clientWidth >= track.scrollWidth - 10) {
+              track.scrollTo({ left: 0, behavior: "smooth" });
+            } else {
+              track.scrollBy({ left: scrollAmount, behavior: "smooth" });
+            }
+          }, 5000);
+        });
+      }
+
+      // If video reels, click slide to open in lightbox
+      if (this.type === "videos") {
+        this.querySelectorAll(".reviora-video-reel-slide").forEach((slide) => {
+          slide.onclick = () => {
+            const idx = Number(slide.getAttribute("data-idx"));
+            const review = this.reviews[idx];
+            if (review && review.media && review.media.length > 0) {
+              globalLightbox.open(review.media, 0, review.authorName);
+            }
+          };
+        });
+      }
+    }
+  }
+
+  if (!customElements.get("reviora-reviews-carousel")) {
+    customElements.define("reviora-reviews-carousel", RevioraReviewsCarousel);
   }
 })();

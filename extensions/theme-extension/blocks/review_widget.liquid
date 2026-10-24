@@ -9,7 +9,7 @@
   {% endif %}
 
   <reviora-reviews-widget
-    data-shop="{{ shop.permanent_domain }}"
+    data-shop="{{ shop.myshopify_domain | default: shop.domain }}"
     data-product-id="{{ current_product_id }}"
     data-product-title="{{ product.title | default: 'Sample Product' | escape }}"
     data-star-color="{{ block.settings.star_color | default: '#FFB800' }}"
@@ -30,7 +30,7 @@
         "type": "text",
         "id": "api_url",
         "label": "App API URL",
-        "info": "Leave blank or paste your app tunnel URL (e.g. https://your-tunnel.trycloudflare.com)"
+        "info": "Leave blank or paste app root domain (e.g. https://reviora-62qh.onrender.com). Do not add /app"
       }, {
         "type": "range",
         "id": "margin_top",
