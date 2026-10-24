@@ -3,7 +3,11 @@
 
 <div class="reviora-app-block" style="margin: {{ block.settings.margin_top }}px 0 {{ block.settings.margin_bottom }}px 0;">
   {% assign target_product_id = "all" %}
-  {% if block.settings.product != blank and block.settings.product.id != blank %}
+  {% if block.settings.product != blank and block.settings.product.handle != blank %}
+    {% assign target_product_id = block.settings.product.handle %}
+  {% elsif product != blank and product.handle != blank %}
+    {% assign target_product_id = product.handle %}
+  {% elsif block.settings.product != blank and block.settings.product.id != blank %}
     {% assign target_product_id = block.settings.product.id %}
   {% elsif product != blank and product.id != blank %}
     {% assign target_product_id = product.id %}

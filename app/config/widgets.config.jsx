@@ -30,7 +30,7 @@ export const widgetsConfig = [
       reviewsPerPage: 5,
     },
     snippet: (shop) =>
-      `<reviora-reviews-widget data-shop="${shop}" data-product-id="{{ product.id }}"></reviora-reviews-widget>`,
+      `<reviora-reviews-widget data-shop="${shop}" data-product-id="{{ product.handle }}"></reviora-reviews-widget>`,
     preview: {
       gradient: "linear-gradient(135deg, #a7f3d0 0%, #6ee7b7 50%, #bbf7d0 100%)",
       accentColor: "#10b981",
@@ -79,56 +79,6 @@ export const widgetsConfig = [
     },
   },
   {
-    id: "star_rating",
-    title: "Star Rating Badge",
-    description: "Show the average rating of your products and how many reviews they've received.",
-    badge: null,
-    badgeTone: "info",
-    hasInstall: true,
-    blockHandle: "star_rating",
-    blockName: "Star Rating Badge",
-    template: "product",
-    defaultSettings: {
-      starColor: "#FFB800",
-      textColor: "#0F172A",
-      alignment: "left",
-      showNumericRating: true,
-      showReviewCount: true,
-      badgeStyle: "inline",
-      fontSize: "14",
-    },
-    snippet: () =>
-      `{% render 'stars', rating: product.metafields.reviora.avg_rating.value | default: 5 %}`,
-    preview: {
-      gradient: "linear-gradient(135deg, #7dd3fc 0%, #38bdf8 50%, #93c5fd 100%)",
-      accentColor: "#0284c7",
-      icon: "⭐",
-      render: () => (
-        <div
-          style={{
-            width: "88%",
-            background: "#ffffff",
-            borderRadius: "8px",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-            padding: "16px",
-            boxSizing: "border-box",
-          }}
-        >
-          <div style={{ height: "4px", background: "#e2e8f0", borderRadius: "2px", width: "45%", marginBottom: "6px" }} />
-          <div style={{ height: "4px", background: "#f1f5f9", borderRadius: "2px", width: "25%", marginBottom: "12px" }} />
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-            <span style={{ color: "#0f172a", fontSize: "16px", letterSpacing: "2px" }}>★★★★★</span>
-            <span style={{ fontSize: "13px", fontWeight: "700", color: "#0f172a" }}>4.8</span>
-          </div>
-          <div style={{ display: "flex", gap: "8px" }}>
-            <div style={{ height: "14px", flex: 1, background: "#86efac", borderRadius: "10px" }} />
-            <div style={{ height: "14px", flex: 1, border: "1px solid #cbd5e1", borderRadius: "10px" }} />
-          </div>
-        </div>
-      ),
-    },
-  },
-  {
     id: "write_review",
     title: "Write a Review",
     description: "A pre-installed widget to help your customers write reviews.",
@@ -146,7 +96,7 @@ export const widgetsConfig = [
       allowPhotoUpload: true,
     },
     snippet: () =>
-      `<reviora-write-review-button product-id="{{ product.id }}"></reviora-write-review-button>`,
+      `<reviora-write-review-button product-id="{{ product.handle }}"></reviora-write-review-button>`,
     preview: {
       gradient: "linear-gradient(135deg, #bbf7d0 0%, #86efac 50%, #a7f3d0 100%)",
       accentColor: "#10b981",

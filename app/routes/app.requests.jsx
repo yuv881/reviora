@@ -45,7 +45,7 @@ export const loader = async ({ request }) => {
       const items = (o.lineItems?.nodes || []).map((li) => ({
         id: li.id,
         title: li.title,
-        productId: li.product?.id ? li.product.id.replace("gid://shopify/Product/", "") : "",
+        productId: li.product?.handle || (li.product?.id ? li.product.id.replace("gid://shopify/Product/", "") : ""),
         productHandle: li.product?.handle || "",
       }));
 
@@ -87,8 +87,9 @@ export const action = async ({ request }) => {
     const customerEmail = formData.get("customerEmail")?.trim();
     const customerName = formData.get("customerName")?.trim() || "Valued Customer";
     const productTitle = formData.get("productTitle")?.trim() || "Item";
-    const productId = formData.get("productId")?.trim() || "general-product";
     const productHandle = formData.get("productHandle")?.trim() || "";
+    const rawProductId = formData.get("productId")?.trim() || "";
+    const productId = productHandle || rawProductId || "general-product";
 
     if (!customerEmail) return { error: "Customer email is required" };
 

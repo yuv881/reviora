@@ -215,9 +215,14 @@ export async function getStorefrontReviews(shop, productId, { sort = "newest", r
   const allReviews = storeDoc?.reviews || [];
 
   // Filter for matching product and published status (supports all products if "all" or omitted)
-  let matchingReviews = allReviews.filter(
-    (r) => (productId === "all" || !productId ? true : String(r.productId) === String(productId)) && r.status === "PUBLISHED"
-  );
+  const targetId = (productId && productId !== "all") ? String(productId).trim().toLowerCase() : null;
+  let matchingReviews = allReviews.filter((r) => {
+    if (r.status !== "PUBLISHED") return false;
+    if (!targetId) return true;
+    const rProdId = String(r.productId || "").trim().toLowerCase();
+    const rHandle = String(r.productHandle || "").trim().toLowerCase();
+    return rProdId === targetId || rHandle === targetId;
+  });
 
   // Calculate aggregates based on all published reviews for this product
   const total = matchingReviews.length;

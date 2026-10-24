@@ -169,7 +169,19 @@
         this.getAttribute("data-shop") ||
         window.Shopify?.shop ||
         (window.location.hostname.includes("myshopify.com") ? window.location.hostname : "");
-      this.productId = this.getAttribute("data-product-id") || "";
+      // Resolve product handle/id (prefer handle, fallback to URL path if on product page)
+      let pId =
+        this.getAttribute("data-product-handle") ||
+        this.getAttribute("data-product-id") ||
+        "";
+      if (!pId) {
+        const match = window.location.pathname.match(/\/products\/([^/?#]+)/);
+        if (match && match[1]) {
+          pId = decodeURIComponent(match[1]);
+        }
+      }
+      this.productId = pId;
+      this.productHandle = this.getAttribute("data-product-handle") || (pId !== "all" ? pId : "");
       this.productTitle = this.getAttribute("data-product-title") || "";
       this.starColor = this.getAttribute("data-star-color") || "#FFB800";
       this.accentColor = this.getAttribute("data-accent-color") || "#0F172A";
@@ -962,6 +974,7 @@
           const payload = {
             shop: this.shop,
             productId: this.productId,
+            productHandle: this.productHandle,
             productTitle: this.productTitle,
             rating: Number(starRatingInput.value || 5),
             title: modal.querySelector("#reviora-form-title").value,
@@ -1121,7 +1134,17 @@
         this.getAttribute("data-shop") ||
         window.Shopify?.shop ||
         (window.location.hostname.includes("myshopify.com") ? window.location.hostname : "");
-      this.productId = this.getAttribute("data-product-id") || "all";
+      let cId =
+        this.getAttribute("data-product-handle") ||
+        this.getAttribute("data-product-id") ||
+        "all";
+      if ((!cId || cId === "all") && window.location.pathname.includes("/products/")) {
+        const match = window.location.pathname.match(/\/products\/([^/?#]+)/);
+        if (match && match[1]) {
+          cId = decodeURIComponent(match[1]);
+        }
+      }
+      this.productId = cId;
       this.heading = this.getAttribute("data-heading") || "Customer Reviews";
       this.subheading = this.getAttribute("data-subheading") || "Real stories from our community";
       this.starColor = this.getAttribute("data-star-color") || "#FFB800";

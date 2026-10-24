@@ -74,15 +74,17 @@ export const action = async ({ request }) => {
 
   try {
     const payload = await request.json();
-    const { shop, productId, productTitle, rating, title, body, authorName, authorEmail, mediaUrls } = payload;
+    const { shop, productId, productHandle, productTitle, rating, title, body, authorName, authorEmail, mediaUrls } = payload;
 
-    if (!shop || !productId || !rating || !body || !authorName || !authorEmail) {
+    const finalProductId = productHandle || productId;
+    if (!shop || !finalProductId || !rating || !body || !authorName || !authorEmail) {
       return Response.json({ error: "Missing required fields" }, { status: 400, headers: CORS_HEADERS });
     }
 
     const review = await createReview({
       shop,
-      productId,
+      productId: finalProductId,
+      productHandle: productHandle || finalProductId,
       productTitle,
       rating: Number(rating),
       title,
