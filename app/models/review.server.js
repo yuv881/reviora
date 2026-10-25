@@ -4,6 +4,7 @@ import { StoreReviews } from "./review.model.js";
 import { ReviewRequest } from "./reviewRequest.model.js";
 import { uploadToCloudinary } from "../utils/cloudinary.server.js";
 import { unauthenticated } from "../shopify.server.js";
+import { SET_PRODUCT_METAFIELDS_MUTATION, GET_PRODUCT_ID_BY_HANDLE_QUERY } from "../graphql/custom_metafield.js";
 
 /**
  * Verify whether an authorEmail belongs to an existing customer with orders in Shopify
@@ -391,29 +392,213 @@ export async function createReview({
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 
-  const createdReview = updatedDoc.reviews[updatedDoc.reviews.length - 1];
+    const createdReview = updatedDoc.reviews[updatedDoc.reviews.length - 1];
   const obj = createdReview.toObject ? createdReview.toObject({ virtuals: true }) : createdReview;
+
+  // Auto-sync metafields if the new review is published
+  if (status === "PUBLISHED" && (newReviewData.productId || newReviewData.productHandle)) {
+    syncProductReviewMetafields({
+      shop,
+      productId: newReviewData.productId,
+      productHandle: newReviewData.productHandle,
+    }).catch((err) => console.error("[Reviora] Auto-sync metafields error:", err));
+  }
+
   return {
     ...obj,
     id: obj.id || obj._id.toString(),
   };
 }
 
-
-
 /**
  * Delete a specific review from the shop's review collection
  * @param {string} shop
  * @param {string} reviewId
+ * @param {object} [adminClient]
  */
-export async function deleteReview(shop, reviewId) {
+export async function deleteReview(shop, reviewId, adminClient = null) {
   await connectDB();
+  const doc = await StoreReviews.findOne(
+    { shop, "reviews._id": reviewId },
+    { "reviews.$": 1 }
+  ).lean();
+  const targetReview = doc?.reviews?.[0];
+
   const res = await StoreReviews.updateOne(
     { shop },
     { $pull: { reviews: { _id: reviewId } } }
   );
+
+  if (targetReview?.productId || targetReview?.productHandle) {
+    syncProductReviewMetafields({
+      shop,
+      productId: targetReview.productId,
+      productHandle: targetReview.productHandle,
+      adminClient,
+    }).catch((err) => console.error("[Reviora] Metafields sync on delete error:", err));
+  }
+
   return { success: res.modifiedCount > 0 };
 }
+
+/**
+ * Sync product review metrics to Shopify Product Metafields
+ * Namespace: reviora
+ * Keys: reviews, rating, rating_count, distribution
+ *
+ * @param {object} params
+ * @param {string} params.shop
+ * @param {string} [params.productId]
+ * @param {string} [params.productHandle]
+ * @param {object} [params.adminClient]
+ */
+export async function syncProductReviewMetafields({
+  shop,
+  productId,
+  productHandle,
+  adminClient = null,
+}) {
+  if (!shop || (!productId && !productHandle)) return;
+
+  try {
+    await connectDB();
+
+    // 1. Resolve Shopify Admin Client
+    let admin = adminClient;
+    if (!admin) {
+      const auth = await unauthenticated.admin(shop);
+      admin = auth?.admin;
+    }
+    if (!admin) {
+      console.warn(`[Reviora Metafields] Could not resolve admin client for shop "${shop}"`);
+      return;
+    }
+
+    // 2. Resolve Product GID
+    let productGid = null;
+    if (typeof productId === "string" && productId.startsWith("gid://shopify/Product/")) {
+      productGid = productId;
+    } else if (productId && /^\d+$/.test(String(productId).trim())) {
+      productGid = `gid://shopify/Product/${String(productId).trim()}`;
+    }
+
+    const handleToQuery = productHandle || productId;
+    if (!productGid && handleToQuery) {
+      try {
+        const queryRes = await admin.graphql(GET_PRODUCT_ID_BY_HANDLE_QUERY, {
+          variables: { handle: String(handleToQuery) },
+        });
+        const queryJson = await queryRes.json();
+        productGid = queryJson?.data?.productByIdentifier?.id || null;
+      } catch (err) {
+        console.warn(`[Reviora Metafields] Failed to resolve product by handle "${handleToQuery}":`, err?.message || err);
+      }
+    }
+
+    if (!productGid) {
+      console.warn(`[Reviora Metafields] Unable to determine product GID for: ${productId || productHandle}`);
+      return;
+    }
+
+    // 3. Fetch published reviews for this product
+    const storeDoc = await StoreReviews.findOne({ shop }).lean();
+    const allReviews = storeDoc?.reviews || [];
+
+    const targetId = String(productId || "").trim().toLowerCase();
+    const targetHandle = String(productHandle || "").trim().toLowerCase();
+
+    const matchingPublished = allReviews.filter((r) => {
+      if (r.status !== "PUBLISHED") return false;
+      const rProdId = String(r.productId || "").trim().toLowerCase();
+      const rHandle = String(r.productHandle || "").trim().toLowerCase();
+      return (
+        (targetId && (rProdId === targetId || rHandle === targetId)) ||
+        (targetHandle && (rProdId === targetHandle || rHandle === targetHandle))
+      );
+    });
+
+    // 4. Calculate metrics
+    const total = matchingPublished.length;
+    const distribution = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
+    let sum = 0;
+
+    matchingPublished.forEach((r) => {
+      const rNum = Math.round(Number(r.rating) || 5);
+      if (distribution[rNum] !== undefined) {
+        distribution[rNum] += 1;
+      }
+      sum += Number(r.rating) || 5;
+    });
+
+    const averageRating = total > 0 ? (sum / total).toFixed(1) : "0.0";
+
+    // 5. Get top 10 recent published reviews
+    matchingPublished.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const latestReviews = matchingPublished.slice(0, 10).map((r) => ({
+      id: r.id || r._id?.toString(),
+      author: r.authorName || "Anonymous",
+      rating: Number(r.rating) || 5,
+      title: r.title || "",
+      body: r.body || "",
+      replies: (r.replies || []).map((rep) => rep.body || ""),
+      date: r.createdAt ? new Date(r.createdAt).toISOString() : new Date().toISOString(),
+    }));
+
+    // 6. Push to Shopify via metafieldsSet (app-owned structured definitions)
+    const metafields = [
+      {
+        ownerId: productGid,
+        namespace: "$app",
+        key: "reviews",
+        type: "json",
+        value: JSON.stringify(latestReviews),
+      },
+      {
+        ownerId: productGid,
+        namespace: "$app",
+        key: "rating",
+        type: "rating",
+        value: JSON.stringify({
+          scale_min: "1.0",
+          scale_max: "5.0",
+          value: String(averageRating),
+        }),
+      },
+      {
+        ownerId: productGid,
+        namespace: "$app",
+        key: "rating_count",
+        type: "number_integer",
+        value: String(total),
+      },
+      {
+        ownerId: productGid,
+        namespace: "$app",
+        key: "distribution",
+        type: "json",
+        value: JSON.stringify(distribution),
+      },
+    ];
+
+    const response = await admin.graphql(SET_PRODUCT_METAFIELDS_MUTATION, {
+      variables: { metafields },
+    });
+    const result = await response.json();
+    const errors = result?.data?.metafieldsSet?.userErrors;
+
+    if (errors && errors.length > 0) {
+      console.error("[Reviora Metafields] userErrors while syncing metafields:", errors);
+      return { success: false, errors };
+    }
+
+    console.log(`[Reviora Metafields] Synced metafields for ${productGid} (reviews: ${total}, avg: ${averageRating})`);
+    return { success: true, total, averageRating };
+  } catch (err) {
+    console.error("[Reviora Metafields] Failed to sync product metafields:", err?.message || err);
+    return { success: false, error: err?.message };
+  }
+}
+
 
 /**
  * Export all reviews for a shop formatted as standard CSV

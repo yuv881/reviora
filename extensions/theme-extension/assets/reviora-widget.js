@@ -557,15 +557,17 @@
           </div>
 
           <div class="reviora-modal-body">
-            <div class="reviora-step-indicator">
-              <div class="reviora-step-pill is-active" id="reviora-step-pill-1">
-                <span class="reviora-step-circle">1</span> Rating &amp; Review
+            ${this.photoUploadsEnabled ? `
+              <div class="reviora-step-indicator">
+                <div class="reviora-step-pill is-active" id="reviora-step-pill-1">
+                  <span class="reviora-step-circle">1</span> Rating &amp; Review
+                </div>
+                <span class="reviora-step-arrow">&rarr;</span>
+                <div class="reviora-step-pill" id="reviora-step-pill-2">
+                  <span class="reviora-step-circle">2</span> Photos &amp; Media
+                </div>
               </div>
-              <span class="reviora-step-arrow">&rarr;</span>
-              <div class="reviora-step-pill" id="reviora-step-pill-2">
-                <span class="reviora-step-circle">2</span> Photos &amp; Media
-              </div>
-            </div>
+            ` : ""}
 
             <form id="reviora-submit-form">
               <!-- STEP 1: DETAILS -->
@@ -604,22 +606,21 @@
 
                 <div class="reviora-submit-row">
                   <button type="button" class="reviora-cancel-btn" id="reviora-cancel-form-btn">Cancel</button>
-                  <button type="button" class="reviora-write-btn reviora-full-width" id="reviora-goto-step-2-btn">
-                    Continue to Photos &rarr;
-                  </button>
+                  ${this.photoUploadsEnabled ? `
+                    <button type="button" class="reviora-write-btn reviora-full-width" id="reviora-goto-step-2-btn">
+                      Continue to Photos &rarr;
+                    </button>
+                  ` : `
+                    <button type="submit" class="reviora-write-btn reviora-full-width" id="reviora-direct-submit-btn">
+                      Submit Review
+                    </button>
+                  `}
                 </div>
               </div>
 
-              <!-- STEP 2: MEDIA UPLOAD -->
+              <!-- STEP 2: MEDIA UPLOAD (Only rendered if plan includes photos) -->
+              ${this.photoUploadsEnabled ? `
               <div id="reviora-step-2" class="reviora-step-panel" style="display:none;">
-                <div id="reviora-media-unsupported" style="display:none;">
-                  <div class="reviora-plan-locked-box">
-                    <span class="reviora-plan-locked-badge">Plan Notice</span>
-                    <h4 class="reviora-plan-locked-title">Text Reviews Enabled</h4>
-                    <p class="reviora-plan-locked-desc">Media uploads are disabled on this tier. Your written review will be submitted directly!</p>
-                  </div>
-                </div>
-
                 <div id="reviora-media-supported">
                   <label class="reviora-form-label" id="reviora-media-label">Add Photos or Video (Optional)</label>
                   <input type="file" id="reviora-file-input" accept="image/*,video/*" multiple style="display:none;" />
@@ -639,6 +640,9 @@
                   </button>
                 </div>
               </div>
+              ` : `
+              <div id="reviora-step-2" class="reviora-step-panel" style="display:none;"></div>
+              `}
             </form>
 
             <!-- SUCCESS VIEW -->
@@ -807,34 +811,30 @@
         this.currentStep = step;
         if (step === 1) {
           form.style.display = "block";
-          stepIndicator.style.display = "flex";
-          step1Panel.style.display = "block";
-          step2Panel.style.display = "none";
-          successPanel.style.display = "none";
-          stepPill1.className = "reviora-step-pill is-active";
-          stepPill2.className = "reviora-step-pill";
-        } else if (step === 2) {
-          form.style.display = "block";
-          stepIndicator.style.display = "flex";
-          step1Panel.style.display = "none";
-          step2Panel.style.display = "block";
-          successPanel.style.display = "none";
-          stepPill1.className = "reviora-step-pill is-done";
-          stepPill2.className = "reviora-step-pill is-active";
-
-          const supp = modal.querySelector("#reviora-media-supported");
-          const unsupp = modal.querySelector("#reviora-media-unsupported");
-          if (this.photoUploadsEnabled) {
-            supp.style.display = "block";
-            unsupp.style.display = "none";
-          } else {
-            supp.style.display = "none";
-            unsupp.style.display = "block";
+          if (stepIndicator) {
+            stepIndicator.style.display = this.photoUploadsEnabled ? "flex" : "none";
           }
+          if (step1Panel) step1Panel.style.display = "block";
+          if (step2Panel) step2Panel.style.display = "none";
+          if (successPanel) successPanel.style.display = "none";
+          if (stepPill1) stepPill1.className = "reviora-step-pill is-active";
+          if (stepPill2) stepPill2.className = "reviora-step-pill";
+        } else if (step === 2) {
+          if (!this.photoUploadsEnabled) {
+            setStep(1);
+            return;
+          }
+          form.style.display = "block";
+          if (stepIndicator) stepIndicator.style.display = "flex";
+          if (step1Panel) step1Panel.style.display = "none";
+          if (step2Panel) step2Panel.style.display = "block";
+          if (successPanel) successPanel.style.display = "none";
+          if (stepPill1) stepPill1.className = "reviora-step-pill is-done";
+          if (stepPill2) stepPill2.className = "reviora-step-pill is-active";
         } else if (step === 3) {
           form.style.display = "none";
-          stepIndicator.style.display = "none";
-          successPanel.style.display = "block";
+          if (stepIndicator) stepIndicator.style.display = "none";
+          if (successPanel) successPanel.style.display = "block";
         }
       };
 
@@ -963,7 +963,7 @@
       if (form) {
         form.onsubmit = async (e) => {
           e.preventDefault();
-          const submitBtn = modal.querySelector("#reviora-final-submit-btn");
+          const submitBtn = modal.querySelector("#reviora-final-submit-btn") || modal.querySelector("#reviora-direct-submit-btn");
           const skipBtnEl = modal.querySelector("#reviora-skip-media-btn");
           if (submitBtn) {
             submitBtn.disabled = true;

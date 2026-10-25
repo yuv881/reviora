@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useLoaderData, useFetcher, useSubmit, useNavigation, useNavigate } from "react-router";
 
 import { authenticate } from "../shopify.server.js";
-import { getAdminReviews, deleteReview, verifyCustomerByEmail } from "../models/review.server.js";
+import { getAdminReviews, deleteReview, verifyCustomerByEmail, syncProductReviewMetafields } from "../models/review.server.js";
 import { StoreReviews } from "../models/review.model.js";
 import { connectDB } from "../db.server.js";
 import { ReviewCard } from "../components/ReviewCard.jsx";
@@ -34,7 +34,7 @@ export const loader = async ({ request }) => {
 };
 
 export const action = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
   const formData = await request.formData();
   const intent = formData.get("intent");
   const reviewId = formData.get("reviewId");
@@ -43,19 +43,42 @@ export const action = async ({ request }) => {
 
   await connectDB();
 
+  // Find target review to get product identifier for metafield sync
+  const doc = await StoreReviews.findOne(
+    { shop: session.shop, "reviews._id": reviewId },
+    { "reviews.$": 1 }
+  ).lean();
+  const targetReview = doc?.reviews?.[0];
+
   if (intent === "delete") {
-    await deleteReview(session.shop, reviewId);
+    await deleteReview(session.shop, reviewId, admin);
     return { success: true, deleted: true };
   } else if (intent === "publish") {
     await StoreReviews.updateOne(
       { shop: session.shop, "reviews._id": reviewId },
       { $set: { "reviews.$.status": "PUBLISHED", "reviews.$.updatedAt": new Date() } }
     );
+    if (targetReview?.productId || targetReview?.productHandle) {
+      await syncProductReviewMetafields({
+        shop: session.shop,
+        productId: targetReview.productId,
+        productHandle: targetReview.productHandle,
+        adminClient: admin,
+      });
+    }
   } else if (intent === "reject") {
     await StoreReviews.updateOne(
       { shop: session.shop, "reviews._id": reviewId },
       { $set: { "reviews.$.status": "REJECTED", "reviews.$.updatedAt": new Date() } }
     );
+    if (targetReview?.productId || targetReview?.productHandle) {
+      await syncProductReviewMetafields({
+        shop: session.shop,
+        productId: targetReview.productId,
+        productHandle: targetReview.productHandle,
+        adminClient: admin,
+      });
+    }
   } else if (intent === "reply") {
     const replyBody = formData.get("replyBody");
     if (replyBody) {

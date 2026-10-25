@@ -21,9 +21,43 @@ api_version = "2026-10"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "write_products,read_orders,write_discounts,read_themes"
+scopes = "write_products,read_orders,read_customers, read_products,read_themes"
 optional_scopes = [ ]
 use_legacy_install_flow = false
 
 [auth]
 redirect_urls = [ "https://reviora-62qh.onrender.com/api/auth" ]
+
+# =========================================================
+# Structured Product Metafield Definitions
+# =========================================================
+[product.metafields.app.reviews]
+name = "Product Reviews"
+description = "The latest 10 published reviews (public fields only)"
+type = "json"
+access.admin = "merchant_read"
+access.storefront = "public_read"
+
+[product.metafields.app.rating]
+name = "Average Rating"
+description = "Average rating"
+type = "rating"
+access.admin = "merchant_read"
+access.storefront = "public_read"
+validations.scale_min = 1.0
+validations.scale_max = 5.0
+
+[product.metafields.app.rating_count]
+name = "Rating Count"
+description = "Total published reviews"
+type = "number_integer"
+access.admin = "merchant_read"
+access.storefront = "public_read"
+
+[product.metafields.app.distribution]
+name = "Rating Distribution"
+description = "Count per star level"
+type = "json"
+access.admin = "merchant_read"
+access.storefront = "public_read"
+

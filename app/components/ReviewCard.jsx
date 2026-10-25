@@ -126,12 +126,12 @@ export function ReviewCard({ review, onApprove, onReject, onReply, onDelete, isL
           {/* Actions Row */}
           <s-divider></s-divider>
           <s-stack direction="inline" justifyContent="space-between" alignItems="center">
-            <s-button-group gap="small">
+            <s-stack direction="inline" gap="small" alignItems="center">
               {review.status !== "PUBLISHED" && (
                 <s-button
                   variant="primary"
-                  disabled={isLoading}
-                  loading={isLoading && loadingIntent === "publish"}
+                  disabled={isLoading ? true : undefined}
+                  loading={isLoading && loadingIntent === "publish" ? true : undefined}
                   onClick={() => onApprove(review.id)}
                 >
                   Approve &amp; Publish
@@ -142,8 +142,8 @@ export function ReviewCard({ review, onApprove, onReject, onReply, onDelete, isL
                 <s-button
                   variant="secondary"
                   tone="critical"
-                  disabled={isLoading}
-                  loading={isLoading && loadingIntent === "reject"}
+                  disabled={isLoading ? true : undefined}
+                  loading={isLoading && loadingIntent === "reject" ? true : undefined}
                   onClick={() => onReject(review.id)}
                 >
                   Reject
@@ -156,7 +156,7 @@ export function ReviewCard({ review, onApprove, onReject, onReply, onDelete, isL
               >
                 Reply to Customer
               </s-button>
-            </s-button-group>
+            </s-stack>
 
             {onDelete && (
               <s-button
