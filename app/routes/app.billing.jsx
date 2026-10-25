@@ -222,11 +222,12 @@ export default function BillingPage() {
 
   const proFeatures = [
     "Unlimited automated email review requests",
-    "Customer photo uploads & CDN hosting",
+    "Customer photo & video uploads with CDN hosting",
+    "Premium Widgets: Video Reels, UGC Wall, Review Popups & Floating Drawer",
     "Google Shopping & Rich Snippets (Schema.org JSON-LD)",
     "1-click Judge.me, Loox, Yotpo & Okendo import",
     "Verified Buyer trust badges",
-    "All widget layouts (Grid, Carousel, Tab)",
+    "All widget layouts (Standard, Compact, Cards Grid)",
     "Priority 24/7 Email & Chat Support",
   ];
 

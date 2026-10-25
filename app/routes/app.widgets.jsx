@@ -2,11 +2,13 @@ import { useState, useMemo, useEffect } from "react";
 import { useLoaderData, useSearchParams, useNavigation, useSubmit, useActionData } from "react-router";
 import { authenticate } from "../shopify.server.js";
 import { widgetsConfig } from "../config/widgets.config.jsx";
-import { getShopSettings, updateWidgetSettings } from "../models/review.server.js";
-import { CheckCircle2 } from "lucide-react";
+import { getShopSettings, updateShopSettings, updateWidgetSettings, getStorefrontReviews } from "../models/review.server.js";
+import { CheckCircle2, Lock } from "lucide-react";
+import { WidgetLivePreview } from "../components/WidgetLivePreview.jsx";
+import { PageSkeleton } from "../components/PageSkeleton.jsx";
 
 export const loader = async ({ request }) => {
-  const { admin, session } = await authenticate.admin(request);
+  const { admin, session, billing } = await authenticate.admin(request);
   const shop = session.shop;
 
   // Real-time theme fetching via Admin GraphQL
@@ -57,6 +59,44 @@ export const loader = async ({ request }) => {
 
   const shopSettings = await getShopSettings(shop);
 
+  let currentPlan = shopSettings?.plan || "FREE";
+  try {
+    // eslint-disable-next-line no-undef
+    const isTest = process.env.NODE_ENV !== "production";
+    const billingCheck = await billing.check({
+      plans: ["Pro"],
+      isTest,
+    });
+    if (billingCheck.hasActivePayment) {
+      currentPlan = "PRO";
+      if (shopSettings.plan !== "PRO") {
+        await updateShopSettings(shop, { plan: "PRO" });
+      }
+    } else {
+      currentPlan = "FREE";
+      if (shopSettings.plan !== "FREE") {
+        await updateShopSettings(shop, { plan: "FREE" });
+      }
+    }
+  } catch (error) {
+    console.warn("Billing check in widgets loader failed:", error?.message || error);
+  }
+
+  // Load live reviews and aggregates from store for real-time live preview
+  let realReviews = [];
+  let aggregateData = null;
+  try {
+    const storefrontData = await getStorefrontReviews(shop, "all", { limit: 20 });
+    realReviews = storefrontData?.reviews || [];
+    aggregateData = {
+      total: storefrontData?.total || 0,
+      averageRating: storefrontData?.averageRating || 0,
+      distribution: storefrontData?.distribution || {},
+    };
+  } catch (err) {
+    console.warn("Could not load storefront reviews for widgets preview:", err?.message || err);
+  }
+
   // eslint-disable-next-line no-undef
   const apiKey = process.env.SHOPIFY_API_KEY || "";
 
@@ -66,16 +106,43 @@ export const loader = async ({ request }) => {
     defaultThemeId,
     apiKey,
     shopSettings,
+    currentPlan,
+    realReviews,
+    aggregateData,
   };
 };
 
 export const action = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
+  const { session, billing } = await authenticate.admin(request);
   const formData = await request.formData();
   const widgetId = formData.get("widgetId");
 
   if (!widgetId) {
     return { error: "Widget ID is required" };
+  }
+
+  // Plan verification for PRO widgets
+  const widgetDef = widgetsConfig.find((w) => w.id === widgetId);
+  if (widgetDef?.isPremium) {
+    let isPro = false;
+    try {
+      // eslint-disable-next-line no-undef
+      const isTest = process.env.NODE_ENV !== "production";
+      const billingCheck = await billing.check({
+        plans: ["Pro"],
+        isTest,
+      });
+      isPro = billingCheck.hasActivePayment;
+    } catch {
+      const settings = await getShopSettings(session.shop);
+      isPro = settings?.plan === "PRO";
+    }
+
+    if (!isPro) {
+      return {
+        error: "This widget requires an active Reviora Pro plan ($4.99/mo). Please upgrade to save custom settings.",
+      };
+    }
   }
 
   const entries = Object.fromEntries(formData.entries());
@@ -98,7 +165,7 @@ export const action = async ({ request }) => {
 };
 
 export default function WidgetsPage() {
-  const { shop, themes, defaultThemeId, apiKey, shopSettings } = useLoaderData();
+  const { shop, themes, defaultThemeId, apiKey, shopSettings, currentPlan, realReviews, aggregateData } = useLoaderData();
   const [searchParams, setSearchParams] = useSearchParams();
   const actionData = useActionData();
   const navigation = useNavigation();
@@ -107,6 +174,29 @@ export default function WidgetsPage() {
   const [selectedThemeId, setSelectedThemeId] = useState(defaultThemeId);
   const [copiedSnippet, setCopiedSnippet] = useState(false);
   const [showSavedToast, setShowSavedToast] = useState(false);
+  const [proModalWidget, setProModalWidget] = useState(null);
+
+  const handleOpenProModal = (widget) => {
+    setProModalWidget(widget);
+    if (window.shopify?.modal) {
+      window.shopify.modal.show("upgrade-pro-modal");
+    } else {
+      document.getElementById("upgrade-pro-modal")?.showOverlay();
+    }
+  };
+
+  const handleCloseProModal = () => {
+    if (window.shopify?.modal) {
+      window.shopify.modal.hide("upgrade-pro-modal");
+    } else {
+      document.getElementById("upgrade-pro-modal")?.hideOverlay();
+    }
+    setProModalWidget(null);
+  };
+
+  const handleNavigateToBilling = () => {
+    window.location.href = "/app/billing";
+  };
 
   // Studio customizer state
   const customizeWidgetId = searchParams.get("customize");
@@ -173,26 +263,43 @@ export default function WidgetsPage() {
     setTimeout(() => setCopiedSnippet(false), 2000);
   };
 
+  // Show skeleton if page is in loading state
+  const isLoading = navigation.state === "loading";
+  if (isLoading) {
+    return <PageSkeleton />;
+  }
+
   // =========================================================================
   // VIEW 1: CUSTOMIZE WIDGET PAGE (App Bridge Native Layout)
   // =========================================================================
   if (activeWidget) {
+    const isLocked = activeWidget.isPremium && currentPlan !== "PRO";
     const editorDeepLink = getThemeEditorUrl(activeWidget.template || "product", activeWidget.blockHandle);
     const snippetCode =
       typeof activeWidget.snippet === "function" ? activeWidget.snippet(shop) : activeWidget.snippet || "";
 
     return (
-      <s-page heading={`Customize ${activeWidget.title}`}>
+      <s-page heading={`Customize ${activeWidget.title}`} inlineSize="large">
         {/* Action Buttons */}
-        <s-button
-          slot="primary-action"
-          variant="primary"
-          onClick={handleSave}
-          loading={isSaving ? true : undefined}
-          disabled={isSaving}
-        >
-          {isSaving ? "Saving..." : "Save changes"}
-        </s-button>
+        {isLocked ? (
+          <s-button
+            slot="primary-action"
+            variant="primary"
+            onClick={() => handleOpenProModal(activeWidget)}
+          >
+            Upgrade to Pro to Save 🔒
+          </s-button>
+        ) : (
+          <s-button
+            slot="primary-action"
+            variant="primary"
+            onClick={handleSave}
+            loading={isSaving ? true : undefined}
+            disabled={isSaving}
+          >
+            {isSaving ? "Saving..." : "Save changes"}
+          </s-button>
+        )}
 
         <s-button
           slot="secondary-actions"
@@ -205,19 +312,46 @@ export default function WidgetsPage() {
         <s-button
           slot="secondary-actions"
           variant="secondary"
-          onClick={() => window.open(editorDeepLink, "_blank", "noopener,noreferrer")}
+          onClick={() => {
+            if (isLocked) {
+              handleOpenProModal(activeWidget);
+            } else {
+              window.open(editorDeepLink, "_blank", "noopener,noreferrer");
+            }
+          }}
         >
-          Open in Theme Editor ↗
+          {isLocked ? "Open in Theme Editor 🔒" : "Open in Theme Editor ↗"}
         </s-button>
 
         <s-stack gap="base">
+          {isLocked && (
+            <s-banner tone="warning" heading="PRO Feature: Upgrade Required">
+              <s-stack gap="tight">
+                <s-paragraph>
+                  <strong>{activeWidget.title}</strong> is an exclusive Reviora Pro feature ($4.99/month with a 14-day free trial). You can preview styling below, but an active Pro plan is required to save changes and install it on your live store.
+                </s-paragraph>
+                <div style={{ marginTop: "4px" }}>
+                  <s-button variant="primary" onClick={() => handleOpenProModal(activeWidget)}>
+                    Upgrade to Pro Plan ↗
+                  </s-button>
+                </div>
+              </s-stack>
+            </s-banner>
+          )}
+
+          {actionData?.error && (
+            <s-banner tone="critical" heading="Subscription Notice">
+              <s-paragraph>{actionData.error}</s-paragraph>
+            </s-banner>
+          )}
+
           {showSavedToast && (
             <s-banner tone="success" heading="Settings saved">
               <s-paragraph>Your widget configuration has been saved successfully.</s-paragraph>
             </s-banner>
           )}
 
-          <s-grid gridTemplateColumns="1fr 1fr" gap="base">
+          <s-grid gridTemplateColumns="340px 1fr" gap="base">
             {/* Left Column: Settings Configuration */}
             <s-stack gap="base">
               <s-section heading="Widget Details">
@@ -447,6 +581,82 @@ export default function WidgetsPage() {
                       <s-option value="grid">Grid (Cards)</s-option>
                     </s-select>
                   )}
+
+                  {settings.position !== undefined && (
+                    <s-select
+                      label="Screen Position"
+                      value={settings.position || "bottom-right"}
+                      onChange={(e) => handleSettingChange("position", e.target.value)}
+                    >
+                      <s-option value="bottom-right">Bottom Right</s-option>
+                      <s-option value="bottom-left">Bottom Left</s-option>
+                      <s-option value="mid-right">Center Right</s-option>
+                      <s-option value="mid-left">Center Left</s-option>
+                    </s-select>
+                  )}
+
+                  {settings.alignment !== undefined && (
+                    <s-select
+                      label="Alignment"
+                      value={settings.alignment || "left"}
+                      onChange={(e) => handleSettingChange("alignment", e.target.value)}
+                    >
+                      <s-option value="left">Left</s-option>
+                      <s-option value="center">Center</s-option>
+                      <s-option value="right">Right</s-option>
+                    </s-select>
+                  )}
+
+                  {settings.columns !== undefined && (
+                    <s-select
+                      label="Columns per row"
+                      value={String(settings.columns || "4")}
+                      onChange={(e) => handleSettingChange("columns", e.target.value)}
+                    >
+                      <s-option value="3">3 Columns</s-option>
+                      <s-option value="4">4 Columns</s-option>
+                      <s-option value="5">5 Columns</s-option>
+                    </s-select>
+                  )}
+
+                  {settings.bgColor !== undefined && (
+                    <s-stack gap="extra-tight">
+                      <label htmlFor="bgColorInput" style={{ fontSize: "13px", fontWeight: "600", color: "#374151" }}>
+                        Background Color
+                      </label>
+                      <s-stack direction="inline" gap="small" alignItems="center">
+                        <input
+                          type="color"
+                          id="bgColorInput"
+                          value={settings.bgColor || "#0F172A"}
+                          onChange={(e) => handleSettingChange("bgColor", e.target.value)}
+                          style={{
+                            width: "44px",
+                            height: "36px",
+                            border: "1px solid #d1d5db",
+                            borderRadius: "6px",
+                            cursor: "pointer",
+                            padding: "2px",
+                            background: "#fff",
+                          }}
+                        />
+                        <input
+                          type="text"
+                          aria-label="Background Color Hex"
+                          value={settings.bgColor || "#0F172A"}
+                          onChange={(e) => handleSettingChange("bgColor", e.target.value)}
+                          style={{
+                            height: "36px",
+                            border: "1px solid #d1d5db",
+                            borderRadius: "6px",
+                            padding: "0 10px",
+                            fontSize: "13px",
+                            width: "120px",
+                          }}
+                        />
+                      </s-stack>
+                    </s-stack>
+                  )}
                 </s-stack>
               </s-section>
 
@@ -480,6 +690,27 @@ export default function WidgetsPage() {
                       value={settings.buttonText || ""}
                       onInput={(e) => handleSettingChange("buttonText", e.target.value)}
                     />
+                  )}
+
+                  {settings.tabText !== undefined && (
+                    <s-text-field
+                      label="Floating Tab Text"
+                      value={settings.tabText || ""}
+                      onInput={(e) => handleSettingChange("tabText", e.target.value)}
+                    />
+                  )}
+
+                  {settings.interval !== undefined && (
+                    <s-select
+                      label="Notification Interval"
+                      value={String(settings.interval || 6)}
+                      onChange={(e) => handleSettingChange("interval", Number(e.target.value))}
+                    >
+                      <s-option value="4">4 seconds</s-option>
+                      <s-option value="6">6 seconds</s-option>
+                      <s-option value="8">8 seconds</s-option>
+                      <s-option value="10">10 seconds</s-option>
+                    </s-select>
                   )}
 
                   {settings.showVerifiedBadge !== undefined && (
@@ -570,59 +801,12 @@ export default function WidgetsPage() {
             <s-stack gap="base">
               <s-section heading="Widget Preview">
                 <s-stack gap="base">
-                  <s-box padding="base" background="subdued" borderRadius="base">
-                    <div
-                      style={{
-                        height: "240px",
-                        background:
-                          activeWidget.preview?.gradient ||
-                          "linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        borderRadius: "8px",
-                        padding: "16px",
-                        boxSizing: "border-box",
-                        position: "relative",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {activeWidget.preview?.render ? (
-                        activeWidget.preview.render()
-                      ) : (
-                        <div
-                          style={{
-                            background: "#ffffff",
-                            borderRadius: "8px",
-                            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-                            padding: "20px",
-                            textAlign: "center",
-                            maxWidth: "280px",
-                          }}
-                        >
-                          <div style={{ fontSize: "28px", marginBottom: "8px" }}>
-                            {activeWidget.preview?.icon || "✨"}
-                          </div>
-                          <div style={{ fontSize: "14px", fontWeight: "700", color: "#1e293b" }}>
-                            {settings.headerTitle || settings.heading || activeWidget.title}
-                          </div>
-                          <div
-                            style={{
-                              fontSize: "14px",
-                              color: settings.starColor || "#FFB800",
-                              marginTop: "6px",
-                              letterSpacing: "2px",
-                            }}
-                          >
-                            ★ ★ ★ ★ ★
-                          </div>
-                          <div style={{ fontSize: "11px", color: "#64748b", marginTop: "6px" }}>
-                            {activeWidget.blockName}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </s-box>
+                  <WidgetLivePreview
+                    widgetId={activeWidget.id}
+                    settings={settings}
+                    realReviews={realReviews}
+                    aggregateData={aggregateData}
+                  />
 
                   <s-text tone="subdued" size="small">
                     Colors and titles configured on the left will automatically apply to this block on your live store.
@@ -654,12 +838,21 @@ export default function WidgetsPage() {
                     </s-stack>
                   </s-stack>
 
-                  <s-button
-                    variant="primary"
-                    onClick={() => window.open(editorDeepLink, "_blank", "noopener,noreferrer")}
-                  >
-                    Open in Theme Editor ↗
-                  </s-button>
+                  {isLocked ? (
+                    <s-button
+                      variant="primary"
+                      onClick={() => handleOpenProModal(activeWidget)}
+                    >
+                      Unlock in Theme Editor (Requires Pro) 🔒
+                    </s-button>
+                  ) : (
+                    <s-button
+                      variant="primary"
+                      onClick={() => window.open(editorDeepLink, "_blank", "noopener,noreferrer")}
+                    >
+                      Open in Theme Editor ↗
+                    </s-button>
+                  )}
 
                   <s-divider></s-divider>
 
@@ -694,7 +887,66 @@ export default function WidgetsPage() {
             </s-stack>
           </s-grid>
         </s-stack>
+        {renderUpgradeProModal()}
       </s-page>
+    );
+  }
+
+  // Local helper for Upgrade PRO Modal
+  function renderUpgradeProModal() {
+    return (
+      <s-modal
+        id="upgrade-pro-modal"
+        heading={`Unlock ${proModalWidget?.title || "Premium Widget"} with Pro`}
+      >
+        <s-stack gap="base">
+          <s-banner tone="info">
+            <s-paragraph>
+              <strong>{proModalWidget?.title || "This widget"}</strong> is an exclusive <strong>Reviora Pro</strong> feature at only <strong>$4.99/month</strong> with a <strong>14-day free trial</strong>.
+            </s-paragraph>
+          </s-banner>
+
+          <s-stack gap="tight">
+            <s-text type="strong">Everything included with Pro:</s-text>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <CheckCircle2 size={16} color="#10b981" />
+              <s-text size="small">All 4 Premium Widgets: Video Reels, UGC Wall, Review Popups & Floating Drawer</s-text>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <CheckCircle2 size={16} color="#10b981" />
+              <s-text size="small">Unlimited automated email review collection requests</s-text>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <CheckCircle2 size={16} color="#10b981" />
+              <s-text size="small">Customer photo & video uploads with fast CDN hosting</s-text>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <CheckCircle2 size={16} color="#10b981" />
+              <s-text size="small">Google Shopping & Rich Snippets (Schema.org JSON-LD)</s-text>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <CheckCircle2 size={16} color="#10b981" />
+              <s-text size="small">Priority 24/7 Email & Chat Support</s-text>
+            </div>
+          </s-stack>
+        </s-stack>
+
+        <s-button
+          slot="primary-action"
+          variant="primary"
+          onClick={handleNavigateToBilling}
+        >
+          Upgrade to Pro (14-Day Free Trial) ↗
+        </s-button>
+        <s-button
+          slot="secondary-actions"
+          commandFor="upgrade-pro-modal"
+          command="--hide"
+          onClick={handleCloseProModal}
+        >
+          Maybe Later
+        </s-button>
+      </s-modal>
     );
   }
 
@@ -704,6 +956,22 @@ export default function WidgetsPage() {
   return (
     <s-page heading="Widgets">
       <s-stack gap="base">
+        {/* Pro Banner for Free Merchants */}
+        {currentPlan !== "PRO" && (
+          <s-banner tone="info" heading="Supercharge Your Store with PRO Widgets">
+            <s-stack gap="extra-tight">
+              <s-paragraph>
+                Unlock high-converting premium widgets like <strong>Video Reels</strong>, <strong>UGC Photo & Video Wall</strong>, <strong>Social Proof Review Toasts</strong>, and the <strong>Floating Reviews Drawer</strong> with Reviora Pro for only $4.99/mo with a 14-day free trial.
+              </s-paragraph>
+              <div style={{ marginTop: "6px" }}>
+                <s-button variant="secondary" onClick={handleNavigateToBilling}>
+                  View Pro Plan ($4.99/mo) ↗
+                </s-button>
+              </div>
+            </s-stack>
+          </s-banner>
+        )}
+
         {/* Theme Selector Section */}
         <s-section>
           <s-stack
@@ -739,6 +1007,7 @@ export default function WidgetsPage() {
         {/* Dynamic Widgets Grid */}
         <s-grid gridTemplateColumns="repeat(auto-fit, minmax(280px, 1fr))" gap="base">
           {widgetsConfig.map((widget) => {
+            const isLocked = widget.isPremium && currentPlan !== "PRO";
             const editorUrl = getThemeEditorUrl(widget.template || "product", widget.blockHandle);
 
             return (
@@ -761,6 +1030,30 @@ export default function WidgetsPage() {
                       overflow: "hidden",
                     }}
                   >
+                    {isLocked && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "10px",
+                          right: "10px",
+                          background: "rgba(15, 23, 42, 0.88)",
+                          backdropFilter: "blur(6px)",
+                          color: "#fef08a",
+                          padding: "4px 8px",
+                          borderRadius: "12px",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          fontSize: "11px",
+                          fontWeight: "700",
+                          zIndex: 2,
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+                        }}
+                      >
+                        <Lock size={12} color="#fef08a" /> PRO Feature
+                      </div>
+                    )}
+
                     {widget.preview?.render ? (
                       widget.preview.render()
                     ) : (
@@ -791,9 +1084,15 @@ export default function WidgetsPage() {
                   <s-stack gap="small">
                     <s-stack direction="inline" justifyContent="space-between" alignItems="center">
                       <s-heading size="small">{widget.title}</s-heading>
-                      {widget.badge && (
+                      {widget.isPremium ? (
+                        currentPlan === "PRO" ? (
+                          <s-badge tone="success">PRO Active</s-badge>
+                        ) : (
+                          <s-badge tone="warning">PRO</s-badge>
+                        )
+                      ) : widget.badge ? (
                         <s-badge tone={widget.badgeTone || "success"}>{widget.badge}</s-badge>
-                      )}
+                      ) : null}
                     </s-stack>
 
                     <div style={{ minHeight: "44px" }}>
@@ -803,30 +1102,43 @@ export default function WidgetsPage() {
                     </div>
 
                     <s-stack direction="inline" gap="small" alignItems="center">
-                      {widget.hasInstall && (
-                        <s-button
-                          size="slim"
-                          onClick={() => window.open(editorUrl, "_blank", "noopener,noreferrer")}
-                        >
-                          Install ↗
-                        </s-button>
+                      {isLocked ? (
+                        <>
+                          <s-button
+                            size="slim"
+                            variant="primary"
+                            onClick={() => handleOpenProModal(widget)}
+                          >
+                            Unlock with Pro 🔒
+                          </s-button>
+
+                          <s-button
+                            size="slim"
+                            variant="secondary"
+                            onClick={() => setSearchParams({ customize: widget.id })}
+                          >
+                            Preview
+                          </s-button>
+                        </>
+                      ) : (
+                        <>
+                          <s-button
+                            size="slim"
+                            variant="primary"
+                            onClick={() => window.open(editorUrl, "_blank", "noopener,noreferrer")}
+                          >
+                            Install ↗
+                          </s-button>
+
+                          <s-button
+                            size="slim"
+                            variant="secondary"
+                            onClick={() => setSearchParams({ customize: widget.id })}
+                          >
+                            Customize
+                          </s-button>
+                        </>
                       )}
-
-                      <s-button
-                        size="slim"
-                        variant="secondary"
-                        onClick={() => setSearchParams({ customize: widget.id })}
-                      >
-                        Customize
-                      </s-button>
-
-                      <s-button
-                        size="slim"
-                        variant="tertiary"
-                        onClick={() => window.open(`/app/widgets?customize=${widget.id}`, "_blank")}
-                      >
-                        ↗
-                      </s-button>
                     </s-stack>
                   </s-stack>
                 </s-stack>
@@ -835,6 +1147,7 @@ export default function WidgetsPage() {
           })}
         </s-grid>
       </s-stack>
+      {renderUpgradeProModal()}
     </s-page>
   );
 }

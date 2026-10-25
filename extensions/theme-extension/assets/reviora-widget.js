@@ -1417,4 +1417,415 @@
   if (!customElements.get("reviora-reviews-carousel")) {
     customElements.define("reviora-reviews-carousel", RevioraReviewsCarousel);
   }
+
+  // =========================================================
+  // 4. FLOATING REVIEWS TAB & DRAWER
+  // =========================================================
+  class RevioraFloatingTab extends HTMLElement {
+    connectedCallback() {
+      this.shop = this.getAttribute("data-shop") || window.Shopify?.shop || "";
+      this.position = this.getAttribute("data-position") || "bottom-right";
+      this.tabText = this.getAttribute("data-tab-text") || "Reviews";
+      this.bgColor = this.getAttribute("data-bg-color") || "#0F172A";
+      this.textColor = this.getAttribute("data-text-color") || "#FFFFFF";
+      this.starColor = this.getAttribute("data-star-color") || "#FFB800";
+      this.isOpen = false;
+      this.reviews = [];
+      this.render();
+      this.fetchReviews();
+    }
+
+    async fetchReviews() {
+      try {
+        const res = await fetch(`/apps/reviora/api/reviews?shop=${encodeURIComponent(this.shop)}&limit=10`);
+        if (res.ok) {
+          const data = await res.json();
+          this.reviews = data.reviews || [];
+          this.updateDrawerContent();
+        }
+      } catch (e) {
+        console.warn("[Reviora] Floating tab fetch error", e);
+      }
+    }
+
+    render() {
+      const posClass = `pos-${this.position}`;
+      const isRight = this.position.includes("right");
+      const drawerPosClass = isRight ? "pos-right" : "pos-left";
+
+      this.innerHTML = `
+        <div class="reviora-floating-tab-trigger ${posClass}" style="background:${this.bgColor};color:${this.textColor};">
+          <span style="color:${this.starColor};">★</span>
+          <span>${this.tabText}</span>
+        </div>
+
+        <div class="reviora-drawer-backdrop is-hidden" id="reviora-tab-backdrop"></div>
+        <div class="reviora-drawer ${drawerPosClass} is-closed" id="reviora-tab-drawer">
+          <div class="reviora-drawer-header">
+            <div>
+              <div style="font-weight:800;font-size:16px;color:#0f172a;">Customer Reviews</div>
+              <div style="font-size:12px;color:#64748b;">Verified store feedback</div>
+            </div>
+            <button type="button" id="reviora-drawer-close-btn" style="background:none;border:none;font-size:22px;color:#94a3b8;cursor:pointer;">&times;</button>
+          </div>
+          <div class="reviora-drawer-body" id="reviora-drawer-body">
+            <div style="text-align:center;padding:30px 0;color:#94a3b8;font-size:13px;">Loading reviews...</div>
+          </div>
+          <div class="reviora-drawer-footer">
+            <button type="button" id="reviora-drawer-write-btn" class="reviora-write-btn" style="width:100%;margin:0;background:${this.bgColor};color:${this.textColor};">
+              Write a Review
+            </button>
+          </div>
+        </div>
+      `;
+
+      const trigger = this.querySelector(".reviora-floating-tab-trigger");
+      const backdrop = this.querySelector("#reviora-tab-backdrop");
+      const drawer = this.querySelector("#reviora-tab-drawer");
+      const closeBtn = this.querySelector("#reviora-drawer-close-btn");
+      const writeBtn = this.querySelector("#reviora-drawer-write-btn");
+
+      const openDrawer = () => {
+        backdrop.classList.remove("is-hidden");
+        drawer.classList.remove("is-closed");
+        this.isOpen = true;
+      };
+
+      const closeDrawer = () => {
+        backdrop.classList.add("is-hidden");
+        drawer.classList.add("is-closed");
+        this.isOpen = false;
+      };
+
+      trigger.onclick = openDrawer;
+      backdrop.onclick = closeDrawer;
+      closeBtn.onclick = closeDrawer;
+
+      if (writeBtn) {
+        writeBtn.onclick = () => {
+          closeDrawer();
+          const mainWidget = document.querySelector("reviora-reviews-widget");
+          if (mainWidget) {
+            mainWidget.scrollIntoView({ behavior: "smooth" });
+            const modal = mainWidget.querySelector("#reviora-write-modal");
+            if (modal) modal.classList.remove("is-hidden");
+          }
+        };
+      }
+    }
+
+    updateDrawerContent() {
+      const body = this.querySelector("#reviora-drawer-body");
+      if (!body) return;
+
+      const list = this.reviews.length > 0 ? this.reviews : DEMO_CARDS;
+      body.innerHTML = list.map((r) => `
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="font-weight:700;font-size:13px;color:#0f172a;">${r.authorName}</span>
+            <span class="reviora-verified-badge" style="font-size:10px;">✓ Verified</span>
+          </div>
+          <div style="margin-bottom:6px;">${renderStarsSvg(r.rating || 5, this.starColor, 13)}</div>
+          ${r.title ? `<div style="font-weight:700;font-size:13px;color:#0f172a;margin-bottom:4px;">${r.title}</div>` : ""}
+          <p style="margin:0;font-size:12px;color:#475569;line-height:1.4;">${r.body}</p>
+        </div>
+      `).join("");
+    }
+  }
+
+  if (!customElements.get("reviora-floating-tab")) {
+    customElements.define("reviora-floating-tab", RevioraFloatingTab);
+  }
+
+  // =========================================================
+  // 5. SOCIAL PROOF REVIEW POPUP TOASTS
+  // =========================================================
+  class RevioraReviewPopups extends HTMLElement {
+    connectedCallback() {
+      this.shop = this.getAttribute("data-shop") || window.Shopify?.shop || "";
+      this.position = this.getAttribute("data-position") || "bottom-left";
+      this.intervalSec = Number(this.getAttribute("data-interval") || 6);
+      this.starColor = this.getAttribute("data-star-color") || "#FFB800";
+      this.reviews = [];
+      this.currentIndex = 0;
+      this.render();
+      this.fetchAndStart();
+    }
+
+    disconnectedCallback() {
+      if (this.timer) clearInterval(this.timer);
+    }
+
+    async fetchAndStart() {
+      try {
+        const res = await fetch(`/apps/reviora/api/reviews?shop=${encodeURIComponent(this.shop)}&limit=10`);
+        if (res.ok) {
+          const data = await res.json();
+          this.reviews = data.reviews || [];
+        }
+      } catch (e) {
+        console.warn("[Reviora] Popup fetch error", e);
+      }
+      this.startLoop();
+    }
+
+    render() {
+      const posClass = `pos-${this.position}`;
+      this.innerHTML = `
+        <div class="reviora-popup-container ${posClass}" id="reviora-popup-container"></div>
+      `;
+    }
+
+    startLoop() {
+      const list = this.reviews.length > 0 ? this.reviews : DEMO_CARDS;
+      if (list.length === 0) return;
+
+      const showNext = () => {
+        const container = this.querySelector("#reviora-popup-container");
+        if (!container) return;
+
+        const r = list[this.currentIndex];
+        this.currentIndex = (this.currentIndex + 1) % list.length;
+
+        const initials = (r.authorName || "Customer").split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+
+        const toast = document.createElement("div");
+        toast.className = "reviora-popup-toast";
+        toast.innerHTML = `
+          <button type="button" class="reviora-popup-close" aria-label="Close">&times;</button>
+          <div class="reviora-popup-avatar">${initials}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+              <span style="font-weight:700;font-size:12px;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.authorName}</span>
+              <span style="color:#059669;font-size:10px;font-weight:700;">✓ Verified</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+              ${renderStarsSvg(r.rating || 5, this.starColor, 11)}
+              <span style="font-size:10px;color:#94a3b8;">Recent order</span>
+            </div>
+            <div style="font-size:11px;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-style:italic;">
+              "${r.body || r.title || 'Excellent purchase!'}"
+            </div>
+          </div>
+        `;
+
+        toast.querySelector(".reviora-popup-close").onclick = () => {
+          toast.remove();
+        };
+
+        container.innerHTML = "";
+        container.appendChild(toast);
+
+        setTimeout(() => {
+          if (toast.parentNode) {
+            toast.classList.add("is-fading");
+            setTimeout(() => toast.remove(), 300);
+          }
+        }, (this.intervalSec - 1) * 1000);
+      };
+
+      setTimeout(showNext, 2000);
+      this.timer = setInterval(showNext, this.intervalSec * 1000);
+    }
+  }
+
+  if (!customElements.get("reviora-review-popups")) {
+    customElements.define("reviora-review-popups", RevioraReviewPopups);
+  }
+
+  // =========================================================
+  // 6. UGC PHOTO & VIDEO WALL GRID
+  // =========================================================
+  class RevioraUgcMediaGrid extends HTMLElement {
+    connectedCallback() {
+      this.shop = this.getAttribute("data-shop") || window.Shopify?.shop || "";
+      this.heading = this.getAttribute("data-heading") || "Customer Photos & Videos";
+      this.subheading = this.getAttribute("data-subheading") || "Real photos shared by verified customers";
+      this.columns = this.getAttribute("data-columns") || "4";
+      this.starColor = this.getAttribute("data-star-color") || "#FFB800";
+      this.render();
+      this.fetchMedia();
+    }
+
+    async fetchMedia() {
+      try {
+        const res = await fetch(`/apps/reviora/api/reviews?shop=${encodeURIComponent(this.shop)}&limit=20`);
+        if (res.ok) {
+          const data = await res.json();
+          const reviewsWithMedia = (data.reviews || []).filter((r) => r.media && r.media.length > 0);
+          this.renderGrid(reviewsWithMedia);
+        }
+      } catch (e) {
+        console.warn("[Reviora] UGC Grid error", e);
+      }
+    }
+
+    render() {
+      this.innerHTML = `
+        <div class="reviora-carousel-block">
+          <div class="reviora-carousel-header">
+            <h2 class="reviora-carousel-title">${this.heading}</h2>
+            ${this.subheading ? `<p class="reviora-carousel-sub">${this.subheading}</p>` : ""}
+          </div>
+          <div class="reviora-ugc-grid cols-${this.columns}" id="reviora-ugc-grid-items">
+            ${[
+              { img: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600&auto=format&fit=crop&q=80", author: "Sarah J.", note: "Loved it!", stars: "★★★★★" },
+              { img: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=600&auto=format&fit=crop&q=80", author: "Marcus V.", note: "Video Review", stars: "★★★★★", isVid: true },
+              { img: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=600&auto=format&fit=crop&q=80", author: "Emily W.", note: "Perfect Fit", stars: "★★★★★" },
+              { img: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&auto=format&fit=crop&q=80", author: "David M.", note: "Great Sound", stars: "★★★★★" }
+            ].map((d) => `
+              <div class="reviora-ugc-tile" style="position:relative;overflow:hidden;border-radius:12px;background:#0f172a;">
+                <img src="${d.img}" alt="${d.author}" style="width:100%;height:100%;object-fit:cover;display:block;" loading="lazy">
+                ${d.isVid ? `<span style="position:absolute;top:10px;right:10px;background:rgba(15,23,42,0.8);color:#fff;padding:3px 7px;border-radius:6px;font-size:10px;font-weight:700;">▶ 0:45</span>` : ""}
+                <div class="reviora-ugc-tile-overlay" style="position:absolute;bottom:0;left:0;right:0;padding:12px;background:linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 70%, transparent 100%);color:#fff;display:flex;justify-content:space-between;align-items:flex-end;">
+                  <div>
+                    <div style="font-weight:700;font-size:12px;">${d.author}</div>
+                    <div style="font-size:10px;opacity:0.85;">${d.note}</div>
+                  </div>
+                  <div style="color:#fbbf24;font-size:11px;letter-spacing:1px;">${d.stars}</div>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    renderGrid(reviews) {
+      if (!reviews || reviews.length === 0) return;
+      const grid = this.querySelector("#reviora-ugc-grid-items");
+      if (!grid) return;
+
+      grid.innerHTML = reviews.slice(0, 12).map((r, idx) => {
+        const m = r.media[0];
+        const isVideo = m.mediaType === "VIDEO" || /\.(mp4|webm)($|\?)/i.test(m.url);
+        return `
+          <div class="reviora-ugc-tile" data-idx="${idx}">
+            ${isVideo ? `<video src="${m.url}" muted playsinline loop></video>` : `<img src="${m.url}" alt="Customer photo" loading="lazy">`}
+            <div class="reviora-ugc-tile-overlay">
+              <div style="font-weight:700;font-size:12px;">${r.authorName}</div>
+              <div>${renderStarsSvg(r.rating || 5, this.starColor, 11)}</div>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      grid.querySelectorAll(".reviora-ugc-tile").forEach((tile) => {
+        tile.onclick = () => {
+          const idx = Number(tile.getAttribute("data-idx"));
+          const review = reviews[idx];
+          if (review && review.media && review.media.length > 0) {
+            globalLightbox.open(review.media, 0, review.authorName);
+          }
+        };
+      });
+    }
+  }
+
+  if (!customElements.get("reviora-ugc-media-grid")) {
+    customElements.define("reviora-ugc-media-grid", RevioraUgcMediaGrid);
+  }
+
+  // =========================================================
+  // 7. ALL REVIEWS DEDICATED PAGE
+  // =========================================================
+  class RevioraAllReviewsPage extends HTMLElement {
+    connectedCallback() {
+      this.shop = this.getAttribute("data-shop") || window.Shopify?.shop || "";
+      this.heading = this.getAttribute("data-heading") || "All Store Reviews";
+      this.subheading = this.getAttribute("data-subheading") || "Verified customer feedback from across our entire catalog";
+      this.starColor = this.getAttribute("data-star-color") || "#FFB800";
+      this.accentColor = this.getAttribute("data-accent-color") || "#0F172A";
+      this.innerHTML = `
+        <div class="reviora-widget-container" style="--reviora-star:${this.starColor};--reviora-primary:${this.accentColor};">
+          <div class="reviora-header" style="text-align:center;padding:36px 24px;">
+            <h1 style="font-size:28px;font-weight:800;color:#0f172a;margin:0 0 10px 0;">${this.heading}</h1>
+            <p style="margin:0 0 20px 0;font-size:14px;color:#64748b;">${this.subheading}</p>
+            <div style="display:inline-flex;align-items:center;gap:16px;background:#f8fafc;padding:12px 24px;border-radius:999px;border:1px solid #e2e8f0;">
+              <span style="font-size:28px;font-weight:800;color:#0f172a;">4.9</span>
+              <div>
+                <div>${renderStarsSvg(4.9, this.starColor, 16)}</div>
+                <div style="font-size:12px;color:#64748b;">From 1,280 verified buyers</div>
+              </div>
+            </div>
+          </div>
+          <div class="reviora-list">
+            ${DEMO_CARDS.map((c) => `
+              <div class="reviora-card">
+                <div class="reviora-card-top">
+                  <div class="reviora-author-meta">
+                    <div class="reviora-avatar">${c.authorName.slice(0, 2).toUpperCase()}</div>
+                    <div class="reviora-author-details">
+                      <div class="reviora-author-name-row">
+                        <span class="reviora-author">${c.authorName}</span>
+                        <span class="reviora-verified-badge">✓ Verified</span>
+                      </div>
+                      <div>${renderStarsSvg(c.rating || 5, this.starColor, 14)}</div>
+                    </div>
+                  </div>
+                  <span class="reviora-date">Recent order</span>
+                </div>
+                <h3 class="reviora-card-title">${c.title}</h3>
+                <div class="reviora-card-body">${c.body}</div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  if (!customElements.get("reviora-all-reviews-page")) {
+    customElements.define("reviora-all-reviews-page", RevioraAllReviewsPage);
+  }
+
+  // =========================================================
+  // 8. PRODUCT QUESTIONS & ANSWERS WIDGET
+  // =========================================================
+  class RevioraQaWidget extends HTMLElement {
+    connectedCallback() {
+      this.heading = this.getAttribute("data-heading") || "Customer Questions & Answers";
+      this.accentColor = this.getAttribute("data-accent-color") || "#0F172A";
+      this.innerHTML = `
+        <div class="reviora-qa-block">
+          <div class="reviora-header" style="padding:24px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+              <div>
+                <h2 class="reviora-main-heading" style="font-size:20px;">${this.heading}</h2>
+                <p style="margin:4px 0 0 0;font-size:13px;color:#64748b;">Have a question? Ask our community or store support.</p>
+              </div>
+              <button type="button" class="reviora-write-btn" style="background:${this.accentColor};color:#fff;padding:8px 18px;font-size:13px;">
+                Ask a Question
+              </button>
+            </div>
+            <div class="reviora-qa-item">
+              <div class="reviora-qa-item-q">
+                <span style="background:#0ea5e9;color:#fff;border-radius:4px;padding:2px 6px;font-size:11px;font-weight:800;">Q</span>
+                <span>How does sizing run for this product?</span>
+              </div>
+              <div class="reviora-qa-item-a">
+                <span style="background:#10b981;color:#fff;border-radius:4px;padding:2px 6px;font-size:11px;font-weight:800;">A</span>
+                <span>It fits true to size! If you prefer a relaxed or loose fit, we recommend ordering one size up.</span>
+              </div>
+            </div>
+            <div class="reviora-qa-item">
+              <div class="reviora-qa-item-q">
+                <span style="background:#0ea5e9;color:#fff;border-radius:4px;padding:2px 6px;font-size:11px;font-weight:800;">Q</span>
+                <span>Is this item covered under the 1-year warranty?</span>
+              </div>
+              <div class="reviora-qa-item-a">
+                <span style="background:#10b981;color:#fff;border-radius:4px;padding:2px 6px;font-size:11px;font-weight:800;">A</span>
+                <span>Yes, all our authentic products include a full 1-year manufacturer warranty with hassle-free replacement.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  if (!customElements.get("reviora-qa-widget")) {
+    customElements.define("reviora-qa-widget", RevioraQaWidget);
+  }
 })();
+

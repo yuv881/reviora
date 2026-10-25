@@ -1,5 +1,4 @@
-import { useState, useEffect } from "react";
-import { Outlet, useLoaderData, useRouteError, Link, useNavigation, useLocation } from "react-router";
+import { Outlet, useLoaderData, useRouteError, Link, useNavigation } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { AppProvider as PolarisAppProvider } from "@shopify/polaris";
@@ -50,29 +49,9 @@ function PolarisLink({ children, url = "", external, ...rest }) {
 export default function App() {
   const { apiKey } = useLoaderData();
   const navigation = useNavigation();
-  const location = useLocation();
 
-  // Route-to-route navigation detection
-  const isNavigating =
-    navigation.state === "loading" &&
-    Boolean(navigation.location && navigation.location.pathname !== location.pathname);
-
-  // Debounce skeleton display by 200ms to eliminate quick-load flicker/blink
-  const [showSkeleton, setShowSkeleton] = useState(false);
-
-  useEffect(() => {
-    let timer;
-    if (isNavigating) {
-      timer = setTimeout(() => {
-        setShowSkeleton(true);
-      }, 200);
-    } else {
-      setShowSkeleton(false);
-    }
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [isNavigating]);
+  // Immediate skeleton display whenever page is loading
+  const isLoading = navigation.state === "loading";
 
   return (
     <AppProvider embedded apiKey={apiKey}>
@@ -85,16 +64,10 @@ export default function App() {
           <s-link href="/app/widgets">Widgets</s-link>
           <s-link href="/app/billing">Billing</s-link>
         </s-app-nav>
-        {showSkeleton ? (
+        {isLoading ? (
           <PageSkeleton />
         ) : (
-          <div
-            style={{
-              opacity: isNavigating ? 0.6 : 1,
-              transition: "opacity 150ms ease",
-              pointerEvents: isNavigating ? "none" : "auto",
-            }}
-          >
+          <div>
             <Outlet />
           </div>
         )}
