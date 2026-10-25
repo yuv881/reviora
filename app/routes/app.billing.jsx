@@ -211,29 +211,26 @@ export default function BillingPage() {
     closeModal();
   };
 
+
   const freeFeatures = [
-    "Standard star rating badge on product pages",
-    "Review list storefront widget",
-    "Storefront review submission forms",
-    "Basic automated spam filter",
-    "Standard CSV review import",
-    "Community & documentation support",
+    "8 Core widgets (Reviews, Star Badge, Q&A, Carousels)",
+    "Storefront review collection & Write a Review form",
+    "Full moderation inbox (Approve, Reject, Spam filters)",
+    "Standard email & documentation support",
   ];
 
   const proFeatures = [
-    "Review request emails & order invitations",
-    "Customer photo & video uploads with CDN hosting",
-    "Premium Widgets: Video Reels, UGC Wall, Review Popups & Floating Drawer",
+    "Automated & manual review request emails by order",
+    "4 Exclusive widgets: Video Reels, UGC Wall, Popups & Floating Tab",
+    "Customer photo & video review uploads with CDN hosting",
     "Google Shopping & Rich Snippets (Schema.org JSON-LD)",
-    "1-click Judge.me, Loox, Yotpo & Okendo import",
-    "Verified Buyer trust badges",
-    "All widget layouts (Standard, Compact, Cards Grid)",
-    "Priority 24/7 Email & Chat Support",
+    "Priority 24/7 Live Chat & Email Support",
   ];
 
   return (
     <s-page heading="Subscription & Plans" inlineSize="small">
       <s-stack gap="base">
+
         {actionData?.error && (
           <s-banner tone="critical" heading="Billing Error">
             <s-paragraph>{actionData.error}</s-paragraph>
@@ -251,7 +248,7 @@ export default function BillingPage() {
               </s-stack>
 
               <s-paragraph color="subdued">
-                Essential review collection and star rating widgets for stores getting started.
+                Essential review collection and 8 standard widgets for stores getting started.
               </s-paragraph>
 
               <s-stack direction="inline" gap="extra-tight" alignItems="baseline">
@@ -308,7 +305,7 @@ export default function BillingPage() {
                 </s-stack>
 
                 <s-paragraph color="subdued">
-                  Unlimited review requests, photo uploads, and priority support.
+                  Automated review requests, 4 premium widgets, photo &amp; video reviews.
                 </s-paragraph>
 
                 <s-stack direction="inline" gap="extra-tight" alignItems="baseline">
@@ -352,6 +349,7 @@ export default function BillingPage() {
             </s-section>
           </div>
         </s-grid>
+
       </s-stack>
 
       {/* Confirmation Modal */}
@@ -389,6 +387,7 @@ export default function BillingPage() {
           Cancel
         </s-button>
       </s-modal>
+
     </s-page>
   );
 }

@@ -910,23 +910,27 @@ export default function WidgetsPage() {
             <s-text type="strong">Everything included with Pro:</s-text>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <CheckCircle2 size={16} color="#10b981" />
-              <s-text size="small">All 4 Premium Widgets: Video Reels, UGC Wall, Review Popups & Floating Drawer</s-text>
+              <s-text size="small">Automated &amp; manual review request emails by order</s-text>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <CheckCircle2 size={16} color="#10b981" />
-              <s-text size="small">Unlimited automated email review collection requests</s-text>
+              <s-text size="small">All 4 Premium Widgets: Video Reels, UGC Wall, Review Popups &amp; Floating Drawer</s-text>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <CheckCircle2 size={16} color="#10b981" />
-              <s-text size="small">Customer photo & video uploads with fast CDN hosting</s-text>
+              <s-text size="small">Customer photo &amp; video uploads with fast CDN hosting</s-text>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <CheckCircle2 size={16} color="#10b981" />
-              <s-text size="small">Google Shopping & Rich Snippets (Schema.org JSON-LD)</s-text>
+              <s-text size="small">Save custom widget styling &amp; live theme editor sync</s-text>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <CheckCircle2 size={16} color="#10b981" />
-              <s-text size="small">Priority 24/7 Email & Chat Support</s-text>
+              <s-text size="small">Google Shopping &amp; Rich Snippets (Schema.org JSON-LD)</s-text>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <CheckCircle2 size={16} color="#10b981" />
+              <s-text size="small">Priority 24/7 Live Chat &amp; Email Support</s-text>
             </div>
           </s-stack>
         </s-stack>

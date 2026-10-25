@@ -254,6 +254,11 @@
         this.photoUploadsEnabled = this.stats.photoUploadsEnabled !== false;
         this.applyFiltersAndSort();
         this.render();
+
+        // Google Shopping & Rich Snippets (Schema.org JSON-LD) - Exclusively for PRO plan users
+        if ((this.stats.isPro || this.stats.plan === "PRO") && Number(this.stats.total) > 0) {
+          this.injectRichSnippetsJsonLd();
+        }
       } catch (e) {
         console.warn("Reviora widget API fallback:", endpoint, e);
         this.rawReviews = [];
@@ -261,6 +266,57 @@
         this.applyFiltersAndSort();
         this.render();
       }
+    }
+
+    injectRichSnippetsJsonLd() {
+      if (!this.stats || Number(this.stats.total) <= 0) return;
+      const cleanProdId = String(this.productId || "product").replace(/[^a-zA-Z0-9_-]/g, "");
+      const scriptId = `reviora-jsonld-${cleanProdId}`;
+      if (document.getElementById(scriptId)) return;
+
+      const productTitle = this.productTitle || (this.getAttribute("data-product-title") || "").trim() || document.title.split(/[-|]/)[0].trim() || "Product";
+      const currentUrl = window.location.href.split("?")[0];
+      const avg = Number(this.stats.averageRating) || 5;
+      const count = Number(this.stats.total) || 0;
+
+      // Extract top published reviews for rich Google results
+      const reviewsJson = (this.rawReviews || []).slice(0, 10).map((r) => ({
+        "@type": "Review",
+        name: r.title || "Customer Review",
+        reviewBody: r.body || "",
+        datePublished: r.createdAt ? new Date(r.createdAt).toISOString().split("T")[0] : undefined,
+        reviewRating: {
+          "@type": "Rating",
+          ratingValue: String(r.rating || 5),
+          bestRating: "5",
+          worstRating: "1",
+        },
+        author: {
+          "@type": "Person",
+          name: r.authorName || "Verified Buyer",
+        },
+      }));
+
+      const schemaData = {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        name: productTitle,
+        url: currentUrl,
+        aggregateRating: {
+          "@type": "AggregateRating",
+          ratingValue: avg.toFixed(1),
+          reviewCount: String(count),
+          bestRating: "5",
+          worstRating: "1",
+        },
+        ...(reviewsJson.length > 0 ? { review: reviewsJson } : {}),
+      };
+
+      const script = document.createElement("script");
+      script.id = scriptId;
+      script.type = "application/ld+json";
+      script.textContent = JSON.stringify(schemaData, null, 2);
+      document.head.appendChild(script);
     }
 
     applyFiltersAndSort() {
