@@ -212,16 +212,16 @@ export default function BillingPage() {
   };
 
   const freeFeatures = [
-    "50 review request emails per month",
     "Standard star rating badge on product pages",
     "Review list storefront widget",
+    "Storefront review submission forms",
     "Basic automated spam filter",
     "Standard CSV review import",
     "Community & documentation support",
   ];
 
   const proFeatures = [
-    "Unlimited automated email review requests",
+    "Review request emails & order invitations",
     "Customer photo & video uploads with CDN hosting",
     "Premium Widgets: Video Reels, UGC Wall, Review Popups & Floating Drawer",
     "Google Shopping & Rich Snippets (Schema.org JSON-LD)",

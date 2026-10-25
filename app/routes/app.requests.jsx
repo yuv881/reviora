@@ -1,15 +1,35 @@
 import { useState, useEffect, useMemo } from "react";
+import process from "process";
 import { useLoaderData, useFetcher, useSubmit, useNavigation } from "react-router";
+import { CheckCircle2 } from "lucide-react";
 
 import { authenticate } from "../shopify.server.js";
 import { ReviewRequest } from "../models/reviewRequest.model.js";
 import { connectDB } from "../db.server.js";
+import { getShopSettings } from "../models/review.server.js";
 import { sendReviewRequestEmail } from "../utils/email.server.js";
 import { GET_RECENT_ORDERS_QUERY } from "../graphql/index.js";
 
 export const loader = async ({ request }) => {
-  const { admin, session } = await authenticate.admin(request);
+  const { admin, billing, session } = await authenticate.admin(request);
   await connectDB();
+
+  let isPro = false;
+  try {
+    const isTest = process.env.NODE_ENV !== "production";
+    const billingCheck = await billing.check({
+      plans: ["Pro"],
+      isTest,
+    });
+    isPro = Boolean(billingCheck.hasActivePayment);
+  } catch {
+    try {
+      const settings = await getShopSettings(session.shop);
+      isPro = settings?.plan === "PRO";
+    } catch {
+      // ignore
+    }
+  }
 
   const url = new URL(request.url);
   const q = url.searchParams.get("q")?.trim() || "";
@@ -74,15 +94,38 @@ export const loader = async ({ request }) => {
     id: r.id || r._id.toString(),
   }));
 
-  return { requests, orders, searchQuery: q };
+  return { requests, orders, searchQuery: q, isPro, shop: session.shop };
 };
 
 export const action = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
+  const { session, billing } = await authenticate.admin(request);
   const formData = await request.formData();
   const intent = formData.get("intent");
 
   if (intent === "send_manual") {
+    let isPro = false;
+    try {
+      const isTest = process.env.NODE_ENV !== "production";
+      const billingCheck = await billing.check({
+        plans: ["Pro"],
+        isTest,
+      });
+      isPro = Boolean(billingCheck.hasActivePayment);
+    } catch {
+      try {
+        const settings = await getShopSettings(session.shop);
+        isPro = settings?.plan === "PRO";
+      } catch {
+        // ignore
+      }
+    }
+
+    if (!isPro) {
+      return {
+        error: "Customer Review Requests is an exclusive Reviora Pro feature ($4.99/mo). Please upgrade your subscription to send review invitations.",
+      };
+    }
+
     const orderId = formData.get("orderId") || `MANUAL-${Date.now()}`;
     const customerEmail = formData.get("customerEmail")?.trim();
     const customerName = formData.get("customerName")?.trim() || "Valued Customer";
@@ -145,11 +188,33 @@ export default function RequestsPage() {
   const requests = loaderData?.requests || [];
   const orders = useMemo(() => loaderData?.orders || [], [loaderData?.orders]);
   const searchQuery = loaderData?.searchQuery || "";
+  const isPro = Boolean(loaderData?.isPro);
   const fetcher = useFetcher();
   const submit = useSubmit();
   const navigation = useNavigation();
   const isSending = fetcher.state === "submitting";
   const isSearching = navigation.state === "loading" && navigation.location?.search !== "";
+
+  // Pro modal controls
+  const handleOpenProModal = () => {
+    if (window.shopify?.modal) {
+      window.shopify.modal.show("upgrade-pro-modal");
+    } else {
+      document.getElementById("upgrade-pro-modal")?.showOverlay();
+    }
+  };
+
+  const handleCloseProModal = () => {
+    if (window.shopify?.modal) {
+      window.shopify.modal.hide("upgrade-pro-modal");
+    } else {
+      document.getElementById("upgrade-pro-modal")?.hideOverlay();
+    }
+  };
+
+  const handleNavigateToBilling = () => {
+    window.location.href = "/app/billing";
+  };
 
   // Search input state
   const [searchInput, setSearchInput] = useState(searchQuery);
@@ -202,6 +267,10 @@ export default function RequestsPage() {
   };
 
   const handleSend = () => {
+    if (!isPro) {
+      handleOpenProModal();
+      return;
+    }
     if (!currentOrder || !currentProduct) return;
     fetcher.submit(
       {
@@ -228,19 +297,40 @@ export default function RequestsPage() {
         )}
 
         {(fetcher.data?.warning || fetcher.data?.error) && (
-          <s-banner tone="critical" heading="Delivery Notice">
+          <s-banner tone="critical" heading="Subscription / Delivery Notice">
             <s-paragraph>{fetcher.data.warning || fetcher.data.error}</s-paragraph>
+          </s-banner>
+        )}
+
+        {/* PRO Banner for Free Merchants */}
+        {!isPro && (
+          <s-banner tone="warning" heading="PRO Feature: Upgrade Required">
+            <s-stack gap="tight">
+              <s-paragraph>
+                <strong>Customer Review Requests</strong> is an exclusive <strong>Reviora Pro</strong> feature ($4.99/month with a 14-day free trial). You can search and view delivered orders below, but an active Pro plan is required to send automated and manual email invitations.
+              </s-paragraph>
+              <div style={{ marginTop: "4px" }}>
+                <s-button variant="primary" onClick={handleOpenProModal}>
+                  Upgrade to Pro Plan ↗
+                </s-button>
+              </div>
+            </s-stack>
           </s-banner>
         )}
 
         {/* Section 1: Send Invitation by Order */}
         <s-section>
           <s-stack gap="base">
-            <s-stack gap="extra-tight">
-              <s-heading size="small">Send Review Invitation by Order</s-heading>
-              <s-text tone="subdued" size="small">
-                Select or search delivered and fulfilled orders from your store to automatically populate customer and product details.
-              </s-text>
+            <s-stack direction="inline" justifyContent="space-between" alignItems="center">
+              <s-stack gap="extra-tight">
+                <s-heading size="small">Send Review Invitation by Order</s-heading>
+                <s-text tone="subdued" size="small">
+                  Select or search delivered and fulfilled orders from your store to automatically populate customer and product details.
+                </s-text>
+              </s-stack>
+              <s-badge tone={isPro ? "success" : "warning"}>
+                {isPro ? "PRO Active" : "PRO Feature"}
+              </s-badge>
             </s-stack>
 
             {/* Order Search Bar */}
@@ -328,14 +418,23 @@ export default function RequestsPage() {
               </s-grid>
 
               <div>
-                <s-button
-                  variant="primary"
-                  loading={isSending ? true : undefined}
-                  disabled={!currentOrder || !currentProduct || !customerEmail.trim() ? true : undefined}
-                  onClick={handleSend}
-                >
-                  Send Review Invitation
-                </s-button>
+                {!isPro ? (
+                  <s-button
+                    variant="primary"
+                    onClick={handleOpenProModal}
+                  >
+                    Upgrade to Pro to Send 🔒
+                  </s-button>
+                ) : (
+                  <s-button
+                    variant="primary"
+                    loading={isSending ? true : undefined}
+                    disabled={!currentOrder || !currentProduct || !customerEmail.trim() ? true : undefined}
+                    onClick={handleSend}
+                  >
+                    Send Review Invitation
+                  </s-button>
+                )}
               </div>
             </s-stack>
           </s-stack>
@@ -392,6 +491,57 @@ export default function RequestsPage() {
           </s-stack>
         </s-section>
       </s-stack>
+
+      {/* Upgrade Pro Modal */}
+      <s-modal id="upgrade-pro-modal" heading="Unlock Review Requests with Reviora Pro">
+        <s-stack gap="base">
+          <s-banner tone="info">
+            <s-paragraph>
+              <strong>Review Requests</strong> is an exclusive <strong>Reviora Pro</strong> feature at only <strong>$4.99/month</strong> with a <strong>14-day free trial</strong>.
+            </s-paragraph>
+          </s-banner>
+
+          <s-stack gap="tight">
+            <s-text type="strong">Everything included with Pro:</s-text>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <CheckCircle2 size={16} color="#10b981" />
+              <s-text size="small">Unlimited email review requests & order fulfillment invitations</s-text>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <CheckCircle2 size={16} color="#10b981" />
+              <s-text size="small">All 4 Premium Widgets: Video Reels, UGC Wall, Review Popups & Floating Drawer</s-text>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <CheckCircle2 size={16} color="#10b981" />
+              <s-text size="small">Customer photo & video uploads with fast CDN hosting</s-text>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <CheckCircle2 size={16} color="#10b981" />
+              <s-text size="small">Google Shopping & Rich Snippets (Schema.org JSON-LD)</s-text>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <CheckCircle2 size={16} color="#10b981" />
+              <s-text size="small">Priority 24/7 Email & Chat Support</s-text>
+            </div>
+          </s-stack>
+        </s-stack>
+
+        <s-button
+          slot="primary-action"
+          variant="primary"
+          onClick={handleNavigateToBilling}
+        >
+          Upgrade to Pro (14-Day Free Trial) ↗
+        </s-button>
+        <s-button
+          slot="secondary-actions"
+          commandFor="upgrade-pro-modal"
+          command="--hide"
+          onClick={handleCloseProModal}
+        >
+          Maybe Later
+        </s-button>
+      </s-modal>
     </s-page>
   );
 }

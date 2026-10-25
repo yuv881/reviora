@@ -1862,3 +1862,15 @@ body.reviora-modal-open {
   border-left: 2px solid var(--reviora-border);
 }
 
+/* =========================================================
+   ZOHO SALESIQ LIVE CHAT VISIBILITY
+   ========================================================= */
+.zsiq_floatmain,
+.zsiq_float,
+.zsiq_theme1,
+#zsiq_float {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 2147483647 !important;
+}

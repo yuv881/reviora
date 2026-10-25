@@ -1,6 +1,7 @@
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 import revioraStyles from "./reviora-admin.css?url";
+import { ZohoSalesIQ } from "./components/ZohoSalesIQ.jsx";
 
 export const links = () => [
   { rel: "stylesheet", href: polarisStyles },
@@ -25,6 +26,7 @@ export default function App() {
         <Outlet />
         <ScrollRestoration />
         <Scripts />
+        <ZohoSalesIQ />
       </body>
     </html>
   );
