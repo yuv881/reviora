@@ -20,7 +20,6 @@ const shopify = shopifyApp({
   billing: {
     [PLAN_PRO]: {
       lineItems: [{ amount: 4.99, currencyCode: "USD", interval: BillingInterval.Every30Days }],
-      trialDays: 14,
     },
   },
   apiKey: process.env.SHOPIFY_API_KEY || "",

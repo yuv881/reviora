@@ -181,8 +181,8 @@ export async function getDashboardMetrics(shop) {
 
   const allReviews = storeDoc?.reviews || [];
   const totalReviews = allReviews.length;
-  const publishedReviews = allReviews.filter((r) => r.status === "PUBLISHED");
-  const pendingReviews = allReviews.filter((r) => r.status === "PENDING").length;
+  const publishedReviews = allReviews.filter((r) => (r.status || "").toUpperCase() === "PUBLISHED");
+  const pendingReviews = allReviews.filter((r) => (r.status || "").toUpperCase() === "PENDING").length;
 
   const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
   let weightedSum = 0;
@@ -218,7 +218,7 @@ export async function getStorefrontReviews(shop, productId, { sort = "newest", r
   // Filter for matching product and published status (supports all products if "all" or omitted)
   const targetId = (productId && productId !== "all") ? String(productId).trim().toLowerCase() : null;
   let matchingReviews = allReviews.filter((r) => {
-    if (r.status !== "PUBLISHED") return false;
+    if ((r.status || "").toUpperCase() !== "PUBLISHED") return false;
     if (!targetId) return true;
     const rProdId = String(r.productId || "").trim().toLowerCase();
     const rHandle = String(r.productHandle || "").trim().toLowerCase();
@@ -323,7 +323,7 @@ export async function createReview({
     status = "FLAGGED";
     riskScore = 0.95;
   } else if (settings.autoPublish && rating >= settings.minAutoPublishRating) {
-    status = "PUBLISHED";
+    status = "Published";
   }
 
   let sentiment = "NEUTRAL";
@@ -392,11 +392,11 @@ export async function createReview({
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 
-    const createdReview = updatedDoc.reviews[updatedDoc.reviews.length - 1];
+  const createdReview = updatedDoc.reviews[updatedDoc.reviews.length - 1];
   const obj = createdReview.toObject ? createdReview.toObject({ virtuals: true }) : createdReview;
 
   // Auto-sync metafields if the new review is published
-  if (status === "PUBLISHED" && (newReviewData.productId || newReviewData.productHandle)) {
+  if (status === "Published" && (newReviewData.productId || newReviewData.productHandle)) {
     syncProductReviewMetafields({
       shop,
       productId: newReviewData.productId,
@@ -508,7 +508,7 @@ export async function syncProductReviewMetafields({
     const targetHandle = String(productHandle || "").trim().toLowerCase();
 
     const matchingPublished = allReviews.filter((r) => {
-      if (r.status !== "PUBLISHED") return false;
+      if ((r.status || "").toUpperCase() !== "PUBLISHED") return false;
       const rProdId = String(r.productId || "").trim().toLowerCase();
       const rHandle = String(r.productHandle || "").trim().toLowerCase();
       return (
@@ -632,7 +632,7 @@ export async function exportReviewsToCsv(shop) {
       `"${(r.authorName || "").replace(/"/g, '""')}"`,
       `"${(r.authorEmail || "").replace(/"/g, '""')}"`,
       `"${(r.productHandle || r.productId || "").replace(/"/g, '""')}"`,
-      `"${r.status || "PUBLISHED"}"`,
+      `"${r.status || "Published"}"`,
       r.verified ? "true" : "false",
     ];
   });

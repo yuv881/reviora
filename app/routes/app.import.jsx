@@ -398,7 +398,7 @@ export default function ImportPage() {
     } else if (currentView === "store") {
       sample =
         `title,body,rating,review_date,reviewer_name,reviewer_email,product_handle,status,verified\n` +
-        `"Transferred review","Imported seamlessly across our Shopify stores.",5,"2026-10-22","Alex Reed","alex.r@example.com","the-complete-snowboard","PUBLISHED","true"`;
+        `"Transferred review","Imported seamlessly across our Shopify stores.",5,"2026-10-22","Alex Reed","alex.r@example.com","the-complete-snowboard","Published","true"`;
       setFileName("store_reviews_backup.csv");
     } else {
       sample =

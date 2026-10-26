@@ -56,7 +56,7 @@ export const action = async ({ request }) => {
   } else if (intent === "publish") {
     await StoreReviews.updateOne(
       { shop: session.shop, "reviews._id": reviewId },
-      { $set: { "reviews.$.status": "PUBLISHED", "reviews.$.updatedAt": new Date() } }
+      { $set: { "reviews.$.status": "Published", "reviews.$.updatedAt": new Date() } }
     );
     if (targetReview?.productId || targetReview?.productHandle) {
       await syncProductReviewMetafields({
@@ -178,7 +178,7 @@ export default function ReviewsManagerPage() {
   const statusOptions = [
     { label: "All Statuses", value: "ALL" },
     { label: "Pending Only", value: "PENDING" },
-    { label: "Published Only", value: "PUBLISHED" },
+    { label: "Published Only", value: "Published" },
     { label: "Flagged (Spam Risk)", value: "FLAGGED" },
     { label: "Rejected", value: "REJECTED" },
   ];

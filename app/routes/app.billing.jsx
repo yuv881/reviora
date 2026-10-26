@@ -86,7 +86,7 @@ export const action = async ({ request }) => {
     try {
       const isTest = process.env.NODE_ENV !== "production";
       const cleanShop = session.shop.replace(".myshopify.com", "");
-      const apiKey = process.env.SHOPIFY_API_KEY || "";
+      const apiKey = process.env.SHOPIFY_API_KEY || "f79eb2d3832f37be2bb3a5c7c1efd416";
       const returnUrl = `https://admin.shopify.com/store/${cleanShop}/apps/${apiKey}/app/billing`;
 
       const response = await admin.graphql(
@@ -95,14 +95,12 @@ export const action = async ({ request }) => {
           $name: String!
           $returnUrl: URL!
           $test: Boolean
-          $trialDays: Int
           $lineItems: [AppSubscriptionLineItemInput!]!
         ) {
           appSubscriptionCreate(
             name: $name
             returnUrl: $returnUrl
             test: $test
-            trialDays: $trialDays
             lineItems: $lineItems
           ) {
             appSubscription {
@@ -120,7 +118,6 @@ export const action = async ({ request }) => {
             name: "Pro",
             returnUrl,
             test: isTest,
-            trialDays: 14,
             lineItems: [
               {
                 plan: {
@@ -361,7 +358,7 @@ export default function BillingPage() {
           <s-banner tone="info">
             <s-paragraph>
               {selectedPlanForModal === "PRO"
-                ? "Upgrading to Pro starts with a 14-day free trial. You will be redirected to Shopify to approve the $4.99/month charge."
+                ? "You will be redirected to Shopify to approve the $4.99/month recurring subscription for Reviora Pro."
                 : "Downgrading to Free will cancel your paid recurring charge. Any reviews previously collected remain safe on your store."}
             </s-paragraph>
           </s-banner>

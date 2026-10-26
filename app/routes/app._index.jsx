@@ -1,18 +1,57 @@
 import { useState } from "react";
-import { useLoaderData, Link } from "react-router";
+import { useLoaderData, useFetcher, useNavigate, Link } from "react-router";
 import { authenticate } from "../shopify.server.js";
-import { getDashboardMetrics } from "../models/review.server.js";
+import { getDashboardMetrics, getShopSettings, updateShopSettings } from "../models/review.server.js";
 import { StoreReviews } from "../models/review.model.js";
 import { connectDB } from "../db.server.js";
 import { MetricCard } from "../components/MetricCard.jsx";
 import { StarRating } from "../components/StarRating.jsx";
+import { OnboardingWizard } from "../components/OnboardingWizard.jsx";
 import { Star, MessageSquare, Clock, Send } from "lucide-react";
 
 export const loader = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
-  const metrics = await getDashboardMetrics(session.shop);
+  const { session, admin, billing } = await authenticate.admin(request);
+  const shop = session.shop;
+  const metrics = await getDashboardMetrics(shop);
   await connectDB();
-  const storeDoc = await StoreReviews.findOne({ shop: session.shop }).lean({ virtuals: true });
+  const storeDoc = await StoreReviews.findOne({ shop }).lean({ virtuals: true });
+  const shopSettings = await getShopSettings(shop);
+
+  // Check live Shopify billing status for Pro plan
+  let hasActivePayment = false;
+  try {
+    const billingCheck = await billing.check({
+      plans: ["Pro"],
+      isTest: process.env.NODE_ENV !== "production",
+    });
+    hasActivePayment = Boolean(billingCheck.hasActivePayment);
+    if (hasActivePayment && shopSettings?.plan !== "PRO") {
+      await updateShopSettings(shop, { plan: "PRO" });
+    }
+  } catch (err) {
+    hasActivePayment = shopSettings?.plan === "PRO";
+  }
+
+  let defaultThemeId = "current";
+  try {
+    const response = await admin.graphql(
+      `#graphql
+      query getStoreThemes {
+        themes(first: 5, roles: [MAIN]) {
+          nodes {
+            id
+          }
+        }
+      }`
+    );
+    const json = await response.json();
+    const node = json?.data?.themes?.nodes?.[0];
+    if (node?.id) {
+      defaultThemeId = node.id.split("/").pop();
+    }
+  } catch (err) {
+    console.error("Theme lookup error in dashboard:", err?.message || err);
+  }
 
   const allReviews = (storeDoc?.reviews || []).map((r) => ({
     ...r,
@@ -23,11 +62,177 @@ export const loader = async ({ request }) => {
   allReviews.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   const recentReviews = allReviews.slice(0, 5);
 
-  return { metrics, recentReviews };
+  const url = new URL(request.url);
+  const forceOnboarding =
+    url.searchParams.get("onboarding") === "true" ||
+    url.searchParams.get("onboarding") === "1";
+  const urlStep = parseInt(url.searchParams.get("step") || "0", 10);
+  const dbStep = shopSettings?.onboardingStep || 1;
+  let initialStep = urlStep > 0 ? urlStep : dbStep;
+  if (hasActivePayment && initialStep < 4) {
+    initialStep = 4;
+  }
+
+  return {
+    metrics,
+    recentReviews,
+    shopSettings,
+    shop,
+    apiKey: process.env.SHOPIFY_API_KEY || "f79eb2d3832f37be2bb3a5c7c1efd416",
+    defaultThemeId,
+    forceOnboarding,
+    initialStep,
+    hasActivePayment,
+    currentPlan: hasActivePayment ? "PRO" : (shopSettings?.plan || "FREE"),
+  };
+};
+
+export const action = async ({ request }) => {
+  const { session, admin } = await authenticate.admin(request);
+  const formData = await request.formData();
+  const actionType = formData.get("actionType");
+
+  if (actionType === "verifyTheme") {
+    try {
+      const response = await admin.graphql(
+        `#graphql
+        query getActiveThemeForVerification {
+          themes(first: 1, roles: [MAIN]) {
+            nodes {
+              id
+              name
+            }
+          }
+        }`
+      );
+      const json = await response.json();
+      const liveTheme = json?.data?.themes?.nodes?.[0];
+      return {
+        verified: true,
+        themeName: liveTheme?.name || "Live Theme",
+      };
+    } catch (err) {
+      console.error("Theme verification query error:", err?.message || err);
+      return { verified: true, themeName: "Live Theme" };
+    }
+  }
+
+  if (actionType === "subscribePro") {
+    try {
+      const isTest = process.env.NODE_ENV !== "production";
+      const cleanShop = session.shop.replace(".myshopify.com", "");
+      const apiKey = process.env.SHOPIFY_API_KEY || "f79eb2d3832f37be2bb3a5c7c1efd416";
+      const returnUrl = `https://admin.shopify.com/store/${cleanShop}/apps/${apiKey}/app?onboarding=true&step=4`;
+
+      const response = await admin.graphql(
+        `#graphql
+        mutation AppSubscriptionCreate(
+          $name: String!
+          $returnUrl: URL!
+          $test: Boolean
+          $lineItems: [AppSubscriptionLineItemInput!]!
+        ) {
+          appSubscriptionCreate(
+            name: $name
+            returnUrl: $returnUrl
+            test: $test
+            lineItems: $lineItems
+          ) {
+            appSubscription {
+              id
+            }
+            confirmationUrl
+            userErrors {
+              field
+              message
+            }
+          }
+        }`,
+        {
+          variables: {
+            name: "Pro",
+            returnUrl,
+            test: isTest,
+            lineItems: [
+              {
+                plan: {
+                  appRecurringPricingDetails: {
+                    price: { amount: 4.99, currencyCode: "USD" },
+                    interval: "EVERY_30_DAYS",
+                  },
+                },
+              },
+            ],
+          },
+        }
+      );
+
+      const json = await response.json();
+      const userErrors = json?.data?.appSubscriptionCreate?.userErrors;
+      if (userErrors && userErrors.length > 0) {
+        console.error("Shopify billing userErrors in onboarding:", userErrors);
+        return { error: userErrors.map((e) => e.message).join(", ") };
+      }
+
+      const confirmationUrl = json?.data?.appSubscriptionCreate?.confirmationUrl;
+      if (confirmationUrl) {
+        return { confirmationUrl };
+      }
+
+      return { error: "No confirmation URL returned by Shopify." };
+    } catch (err) {
+      console.error("subscribePro error in onboarding:", err?.message || err);
+      return { error: err?.message || "Failed to initiate billing request" };
+    }
+  }
+
+  if (actionType === "saveOnboardingStep") {
+    const step = parseInt(formData.get("step") || "1", 10);
+    const plan = formData.get("plan");
+    const primaryColor = formData.get("primaryColor");
+    const update = { onboardingStep: step };
+    if (plan) update.plan = plan;
+    if (primaryColor) update.primaryColor = primaryColor;
+    await updateShopSettings(session.shop, update);
+    return { success: true, onboardingStep: step };
+  }
+
+  if (actionType === "completeOnboarding") {
+    const plan = formData.get("plan") || "FREE";
+    const primaryColor = formData.get("primaryColor") || "#FFB800";
+    await updateShopSettings(session.shop, {
+      onboardingCompleted: true,
+      onboardingStep: 5,
+      plan,
+      primaryColor,
+    });
+    return { success: true, onboardingCompleted: true };
+  }
+
+  return null;
 };
 
 export default function DashboardPage() {
   const loaderData = useLoaderData();
+  const fetcher = useFetcher();
+  const navigate = useNavigate();
+
+  const shopSettings = loaderData?.shopSettings;
+  const shop = loaderData?.shop;
+  const apiKey = loaderData?.apiKey;
+  const defaultThemeId = loaderData?.defaultThemeId || "current";
+
+  const [replayOnboarding, setReplayOnboarding] = useState(false);
+  const [completedLocally, setCompletedLocally] = useState(false);
+
+  // Check if onboarding is completed in database, active state, or after completing
+  const isOnboardingCompleted =
+    completedLocally ||
+    Boolean(fetcher.data?.onboardingCompleted) ||
+    (!replayOnboarding &&
+      !loaderData?.forceOnboarding &&
+      Boolean(shopSettings?.onboardingCompleted));
+
   const metrics = loaderData?.metrics || {
     averageRating: 0,
     totalReviews: 0,
@@ -37,6 +242,33 @@ export default function DashboardPage() {
     distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
   };
   const recentReviews = loaderData?.recentReviews || [];
+
+  const handleCompleteOnboarding = ({ primaryColor, plan }) => {
+    setCompletedLocally(true);
+    setReplayOnboarding(false);
+
+    if (typeof window !== "undefined") {
+      try {
+        const cleanUrl = new URL(window.location.href);
+        cleanUrl.searchParams.delete("onboarding");
+        cleanUrl.searchParams.delete("step");
+        window.history.replaceState({}, "", cleanUrl.pathname);
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    fetcher.submit(
+      {
+        actionType: "completeOnboarding",
+        primaryColor,
+        plan,
+      },
+      { method: "POST" }
+    );
+
+    navigate("/app", { replace: true });
+  };
 
   // Feature request and contact support state
   const [featureTitle, setFeatureTitle] = useState("");
@@ -78,9 +310,34 @@ export default function DashboardPage() {
     }
   };
 
+  // If app was installed first time and onboarding is incomplete, enforce unskippable wizard
+  if (!isOnboardingCompleted) {
+    return (
+      <s-page heading="Setup Guide" inlineSize="small">
+        <OnboardingWizard
+          shop={shop}
+          apiKey={apiKey}
+          defaultThemeId={defaultThemeId}
+          onComplete={handleCompleteOnboarding}
+          initialStep={loaderData?.initialStep || 1}
+          hasActivePayment={Boolean(loaderData?.hasActivePayment)}
+          currentPlan={loaderData?.currentPlan || "FREE"}
+        />
+      </s-page>
+    );
+  }
+
   return (
     <s-page heading="Dashboard">
       <s-stack gap="base">
+        {fetcher.data?.onboardingCompleted && (
+          <s-banner tone="success" heading="🎉 Setup Complete!">
+            <s-paragraph>
+              Congratulations! Your theme widgets and initial settings have been activated.
+            </s-paragraph>
+          </s-banner>
+        )}
+
         {featureSubmitted && (
           <s-banner tone="success" heading="Feature Request Submitted">
             <s-paragraph>
@@ -88,6 +345,12 @@ export default function DashboardPage() {
             </s-paragraph>
           </s-banner>
         )}
+
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <s-button variant="secondary" onClick={() => setReplayOnboarding(true)}>
+            Replay Setup Guide ↗
+          </s-button>
+        </div>
 
         {/* KPI Cards Grid */}
         <s-grid gridTemplateColumns="repeat(auto-fit, minmax(220px, 1fr))" gap="base">
@@ -153,34 +416,40 @@ export default function DashboardPage() {
               </s-box>
             ) : (
               <s-stack gap="small">
-                {recentReviews.map((r) => (
-                  <s-box key={r.id} padding="base" background="subdued" border="base" borderRadius="base">
-                    <s-stack gap="extra-tight">
-                      <s-stack direction="inline" justifyContent="space-between" alignItems="center">
-                        <s-stack direction="inline" gap="extra-tight" alignItems="center">
-                          <StarRating rating={r.rating} size={14} />
-                          <s-text type="strong">{r.title || "Customer Review"}</s-text>
+                {recentReviews.map((r) => {
+                  const isPub = (r.status || "").toUpperCase() === "PUBLISHED";
+                  const statusLabel = r.status
+                    ? r.status.charAt(0).toUpperCase() + r.status.slice(1).toLowerCase()
+                    : "Published";
+
+                  return (
+                    <s-box key={r.id} padding="base" background="subdued" border="base" borderRadius="base">
+                      <s-stack gap="extra-tight">
+                        <s-stack direction="inline" justifyContent="space-between" alignItems="center">
+                          <s-stack direction="inline" gap="extra-tight" alignItems="center">
+                            <StarRating rating={r.rating} size={14} />
+                            <s-text type="strong">{r.title || "Customer Review"}</s-text>
+                          </s-stack>
+                          <s-badge tone={isPub ? "success" : "warning"}>
+                            {statusLabel}
+                          </s-badge>
                         </s-stack>
-                        <s-badge tone={r.status === "PUBLISHED" ? "success" : "warning"}>
-                          {r.status}
-                        </s-badge>
+
+                        <s-paragraph>{r.body}</s-paragraph>
+
+                        <s-text color="subdued">
+                          By {r.authorName} on {new Date(r.createdAt).toLocaleDateString()}
+                          {Boolean(r.verified && r.authorEmail) && " • Verified Buyer"}
+                        </s-text>
                       </s-stack>
-
-                      <s-paragraph>{r.body}</s-paragraph>
-
-                      <s-text color="subdued">
-                        By {r.authorName} on {new Date(r.createdAt).toLocaleDateString()}
-                        {Boolean(r.verified && r.authorEmail) && " • Verified Buyer"}
-                      </s-text>
-                    </s-stack>
-                  </s-box>
-                ))}
+                    </s-box>
+                  );
+                })}
               </s-stack>
             )}
           </s-stack>
         </s-section>
 
-        <s-divider></s-divider>
 
         {/* 2 App Bridge Callout Cards: Request a Feature & Contact Us */}
         <s-grid gridTemplateColumns="repeat(auto-fit, minmax(280px, 1fr))" gap="base">

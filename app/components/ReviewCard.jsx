@@ -8,14 +8,21 @@ export function ReviewCard({ review, onApprove, onReject, onReply, onDelete, isL
   const [previewImage, setPreviewImage] = useState(null);
   const topics = review.topics ? JSON.parse(review.topics) : [];
 
-  let statusTone = "info";
-  if (review.status === "PUBLISHED") statusTone = "success";
-  if (review.status === "PENDING") statusTone = "warning";
-  if (review.status === "FLAGGED" || review.status === "REJECTED") statusTone = "critical";
+  const formatCapitalize = (str) => {
+    if (!str) return "";
+    return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+  };
 
+  const statusUpper = (review.status || "").toUpperCase();
+  let statusTone = "info";
+  if (statusUpper === "PUBLISHED") statusTone = "success";
+  else if (statusUpper === "PENDING") statusTone = "warning";
+  else if (statusUpper === "FLAGGED" || statusUpper === "REJECTED" || statusUpper === "SPAM") statusTone = "critical";
+
+  const sentimentUpper = (review.sentiment || "").toUpperCase();
   let sentimentTone = "info";
-  if (review.sentiment === "POSITIVE") sentimentTone = "success";
-  if (review.sentiment === "NEGATIVE") sentimentTone = "critical";
+  if (sentimentUpper === "POSITIVE") sentimentTone = "success";
+  else if (sentimentUpper === "NEGATIVE") sentimentTone = "critical";
 
   const modalId = `photo-modal-${review.id || "preview"}`;
 
@@ -52,9 +59,9 @@ export function ReviewCard({ review, onApprove, onReject, onReply, onDelete, isL
             </s-stack>
 
             <s-stack direction="inline" gap="small" alignItems="center">
-              <s-badge tone={statusTone}>{review.status}</s-badge>
+              <s-badge tone={statusTone}>{formatCapitalize(review.status)}</s-badge>
               {review.sentiment && (
-                <s-badge tone={sentimentTone}>{review.sentiment}</s-badge>
+                <s-badge tone={sentimentTone}>{formatCapitalize(review.sentiment)}</s-badge>
               )}
             </s-stack>
           </s-stack>
@@ -127,7 +134,7 @@ export function ReviewCard({ review, onApprove, onReject, onReply, onDelete, isL
           <s-divider></s-divider>
           <s-stack direction="inline" justifyContent="space-between" alignItems="center">
             <s-stack direction="inline" gap="small" alignItems="center">
-              {review.status !== "PUBLISHED" && (
+              {statusUpper !== "PUBLISHED" && (
                 <s-button
                   variant="primary"
                   disabled={isLoading ? true : undefined}
@@ -138,7 +145,7 @@ export function ReviewCard({ review, onApprove, onReject, onReply, onDelete, isL
                 </s-button>
               )}
 
-              {review.status !== "REJECTED" && (
+              {statusUpper !== "REJECTED" && (
                 <s-button
                   variant="secondary"
                   tone="critical"

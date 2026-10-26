@@ -307,7 +307,7 @@ export default function RequestsPage() {
           <s-banner tone="warning" heading="PRO Feature: Upgrade Required">
             <s-stack gap="tight">
               <s-paragraph>
-                <strong>Customer Review Requests</strong> is an exclusive <strong>Reviora Pro</strong> feature ($4.99/month with a 14-day free trial). You can search and view delivered orders below, but an active Pro plan is required to send automated and manual email invitations.
+                <strong>Customer Review Requests</strong> is an exclusive <strong>Reviora Pro</strong> feature ($4.99/month). You can search and view delivered orders below, but an active Pro plan is required to send automated and manual email invitations.
               </s-paragraph>
               <div style={{ marginTop: "4px" }}>
                 <s-button variant="primary" onClick={handleOpenProModal}>
@@ -481,7 +481,7 @@ export default function RequestsPage() {
                               : "warning"
                         }
                       >
-                        {req.status}
+                        {req.status ? req.status.charAt(0).toUpperCase() + req.status.slice(1).toLowerCase() : ""}
                       </s-badge>
                     </s-stack>
                   </s-box>
@@ -497,7 +497,7 @@ export default function RequestsPage() {
         <s-stack gap="base">
           <s-banner tone="info">
             <s-paragraph>
-              <strong>Review Requests</strong> is an exclusive <strong>Reviora Pro</strong> feature at only <strong>$4.99/month</strong> with a <strong>14-day free trial</strong>.
+              <strong>Review Requests</strong> is an exclusive <strong>Reviora Pro</strong> feature at only <strong>$4.99/month</strong>.
             </s-paragraph>
           </s-banner>
 
@@ -535,7 +535,7 @@ export default function RequestsPage() {
           variant="primary"
           onClick={handleNavigateToBilling}
         >
-          Upgrade to Pro (14-Day Free Trial) ↗
+          Upgrade to Pro ($4.99/mo) ↗
         </s-button>
         <s-button
           slot="secondary-actions"

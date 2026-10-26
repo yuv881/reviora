@@ -328,7 +328,7 @@ export default function WidgetsPage() {
             <s-banner tone="warning" heading="PRO Feature: Upgrade Required">
               <s-stack gap="tight">
                 <s-paragraph>
-                  <strong>{activeWidget.title}</strong> is an exclusive Reviora Pro feature ($4.99/month with a 14-day free trial). You can preview styling below, but an active Pro plan is required to save changes and install it on your live store.
+                  <strong>{activeWidget.title}</strong> is an exclusive Reviora Pro feature ($4.99/month). You can preview styling below, but an active Pro plan is required to save changes and install it on your live store.
                 </s-paragraph>
                 <div style={{ marginTop: "4px" }}>
                   <s-button variant="primary" onClick={() => handleOpenProModal(activeWidget)}>
@@ -902,7 +902,7 @@ export default function WidgetsPage() {
         <s-stack gap="base">
           <s-banner tone="info">
             <s-paragraph>
-              <strong>{proModalWidget?.title || "This widget"}</strong> is an exclusive <strong>Reviora Pro</strong> feature at only <strong>$4.99/month</strong> with a <strong>14-day free trial</strong>.
+              <strong>{proModalWidget?.title || "This widget"}</strong> is an exclusive <strong>Reviora Pro</strong> feature at only <strong>$4.99/month</strong>.
             </s-paragraph>
           </s-banner>
 
@@ -940,7 +940,7 @@ export default function WidgetsPage() {
           variant="primary"
           onClick={handleNavigateToBilling}
         >
-          Upgrade to Pro (14-Day Free Trial) ↗
+          Upgrade to Pro ($4.99/mo) ↗
         </s-button>
         <s-button
           slot="secondary-actions"
@@ -965,7 +965,7 @@ export default function WidgetsPage() {
           <s-banner tone="info" heading="Supercharge Your Store with PRO Widgets">
             <s-stack gap="extra-tight">
               <s-paragraph>
-                Unlock high-converting premium widgets like <strong>Video Reels</strong>, <strong>UGC Photo & Video Wall</strong>, <strong>Social Proof Review Toasts</strong>, and the <strong>Floating Reviews Drawer</strong> with Reviora Pro for only $4.99/mo with a 14-day free trial.
+                Unlock high-converting premium widgets like <strong>Video Reels</strong>, <strong>UGC Photo & Video Wall</strong>, <strong>Social Proof Review Toasts</strong>, and the <strong>Floating Reviews Drawer</strong> with Reviora Pro for only $4.99/month.
               </s-paragraph>
               <div style={{ marginTop: "6px" }}>
                 <s-button variant="secondary" onClick={handleNavigateToBilling}>

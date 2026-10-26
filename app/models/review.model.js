@@ -46,8 +46,8 @@ export const SingleReviewSchema = new mongoose.Schema(
     verified: { type: Boolean, default: false },
     status: {
       type: String,
-      enum: ["PENDING", "PUBLISHED", "REJECTED", "FLAGGED"],
-      default: "PUBLISHED",
+      enum: ["PENDING", "Published", "REJECTED", "FLAGGED"],
+      default: "Published",
       index: true,
     },
     sentiment: { type: String, default: "NEUTRAL" }, // POSITIVE, NEUTRAL, NEGATIVE
