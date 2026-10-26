@@ -8,6 +8,7 @@ import { MetricCard } from "../components/MetricCard.jsx";
 import { StarRating } from "../components/StarRating.jsx";
 import { OnboardingWizard } from "../components/OnboardingWizard.jsx";
 import { Star, MessageSquare, Clock, Send } from "lucide-react";
+import process from 'process'
 
 export const loader = async ({ request }) => {
   const { session, admin, billing } = await authenticate.admin(request);

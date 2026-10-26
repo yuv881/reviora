@@ -3,7 +3,7 @@ import { useLoaderData, useSearchParams, useNavigation, useSubmit, useActionData
 import { authenticate } from "../shopify.server.js";
 import { widgetsConfig } from "../config/widgets.config.jsx";
 import { getShopSettings, updateShopSettings, updateWidgetSettings, getStorefrontReviews } from "../models/review.server.js";
-import { CheckCircle2, Lock } from "lucide-react";
+import { CheckCircle2, Lock, FileText, Layers } from "lucide-react";
 import { WidgetLivePreview } from "../components/WidgetLivePreview.jsx";
 import { PageSkeleton } from "../components/PageSkeleton.jsx";
 
@@ -175,6 +175,25 @@ export default function WidgetsPage() {
   const [copiedSnippet, setCopiedSnippet] = useState(false);
   const [showSavedToast, setShowSavedToast] = useState(false);
   const [proModalWidget, setProModalWidget] = useState(null);
+  const [showAllReviewsModal, setShowAllReviewsModal] = useState(false);
+
+  const handleOpenAllReviewsModal = () => {
+    setShowAllReviewsModal(true);
+    if (window.shopify?.modal) {
+      window.shopify.modal.show("all-reviews-install-modal");
+    } else {
+      document.getElementById("all-reviews-install-modal")?.showOverlay();
+    }
+  };
+
+  const handleCloseAllReviewsModal = () => {
+    setShowAllReviewsModal(false);
+    if (window.shopify?.modal) {
+      window.shopify.modal.hide("all-reviews-install-modal");
+    } else {
+      document.getElementById("all-reviews-install-modal")?.hideOverlay();
+    }
+  };
 
   const handleOpenProModal = (widget) => {
     setProModalWidget(widget);
@@ -315,6 +334,8 @@ export default function WidgetsPage() {
           onClick={() => {
             if (isLocked) {
               handleOpenProModal(activeWidget);
+            } else if (activeWidget.id === "all_reviews_page") {
+              handleOpenAllReviewsModal();
             } else {
               window.open(editorDeepLink, "_blank", "noopener,noreferrer");
             }
@@ -848,7 +869,13 @@ export default function WidgetsPage() {
                   ) : (
                     <s-button
                       variant="primary"
-                      onClick={() => window.open(editorDeepLink, "_blank", "noopener,noreferrer")}
+                      onClick={() => {
+                        if (activeWidget.id === "all_reviews_page") {
+                          handleOpenAllReviewsModal();
+                        } else {
+                          window.open(editorDeepLink, "_blank", "noopener,noreferrer");
+                        }
+                      }}
                     >
                       Open in Theme Editor ↗
                     </s-button>
@@ -888,6 +915,7 @@ export default function WidgetsPage() {
           </s-grid>
         </s-stack>
         {renderUpgradeProModal()}
+        {renderAllReviewsModal()}
       </s-page>
     );
   }
@@ -949,6 +977,216 @@ export default function WidgetsPage() {
           onClick={handleCloseProModal}
         >
           Maybe Later
+        </s-button>
+      </s-modal>
+    );
+  }
+
+  // Local helper for All Reviews Page Install Modal
+  function renderAllReviewsModal() {
+    const newPageUrl = `https://${shop}/admin/pages/new`;
+    const pageEditorUrl = `https://${shop}/admin/themes/${selectedThemeId}/editor?template=page&addAppBlockId=${apiKey}/all_reviews_page&target=newAppsSection`;
+    const homeEditorUrl = `https://${shop}/admin/themes/${selectedThemeId}/editor?template=index&addAppBlockId=${apiKey}/all_reviews_page&target=newAppsSection`;
+
+    return (
+      <s-modal
+        id="all-reviews-install-modal"
+        heading="Install All Reviews Page Widget"
+      >
+        <s-stack gap="base">
+          <s-paragraph color="subdued">
+            Choose your preferred setup method below to activate your all-store reviews center:
+          </s-paragraph>
+
+          {/* Option 1: Create a Dedicated Reviews Page */}
+          <div
+            style={{
+              padding: "18px 20px",
+              borderRadius: "12px",
+              border: "1px solid #10b981",
+              backgroundColor: "#f0fdf4",
+              display: "flex",
+              flexDirection: "column",
+              gap: "12px",
+              boxShadow: "0 1px 3px rgba(16, 185, 129, 0.08)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div
+                  style={{
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "8px",
+                    backgroundColor: "#d1fae5",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#059669",
+                    flexShrink: 0,
+                  }}
+                >
+                  <FileText size={18} strokeWidth={2.2} />
+                </div>
+                <div>
+                  <div style={{ fontSize: "15px", fontWeight: "600", color: "#065f46" }}>
+                    Option 1: Create a Dedicated Reviews Page
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#047857" }}>
+                    Creates a dedicated URL (e.g. <code>/pages/reviews</code>)
+                  </div>
+                </div>
+              </div>
+              <s-badge tone="success">Recommended for SEO</s-badge>
+            </div>
+
+            <s-paragraph color="subdued">
+              Best for building strong store trust and ranking on Google. Follow this quick 2-step setup:
+            </s-paragraph>
+
+            {/* 2-Step Interactive Grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "2px" }}>
+              {/* Step 1 Card */}
+              <div
+                style={{
+                  backgroundColor: "#ffffff",
+                  border: "1px solid #a7f3d0",
+                  borderRadius: "8px",
+                  padding: "12px 14px",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                  gap: "10px",
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", color: "#059669", letterSpacing: "0.04em", marginBottom: "2px" }}>
+                    Step 1
+                  </div>
+                  <div style={{ fontSize: "13px", fontWeight: "600", color: "#1e293b" }}>
+                    Create Shopify Page
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#64748b", marginTop: "2px", lineHeight: "1.3" }}>
+                    Title it &quot;Reviews&quot; or &quot;Customer Reviews&quot; and save.
+                  </div>
+                </div>
+                <s-button
+                  variant="primary"
+                  onClick={() => window.open(newPageUrl, "_blank", "noopener,noreferrer")}
+                >
+                  Create Page in Shopify ↗
+                </s-button>
+              </div>
+
+              {/* Step 2 Card */}
+              <div
+                style={{
+                  backgroundColor: "#ffffff",
+                  border: "1px solid #a7f3d0",
+                  borderRadius: "8px",
+                  padding: "12px 14px",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                  gap: "10px",
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: "700", textTransform: "uppercase", color: "#059669", letterSpacing: "0.04em", marginBottom: "2px" }}>
+                    Step 2
+                  </div>
+                  <div style={{ fontSize: "13px", fontWeight: "600", color: "#1e293b" }}>
+                    Add Reviews Widget
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#64748b", marginTop: "2px", lineHeight: "1.3" }}>
+                    Theme Editor opens with the widget block pre-selected.
+                  </div>
+                </div>
+                <s-button
+                  variant="secondary"
+                  onClick={() => window.open(pageEditorUrl, "_blank", "noopener,noreferrer")}
+                >
+                  Open in Theme Editor ↗
+                </s-button>
+              </div>
+            </div>
+          </div>
+
+          {/* Option 2: Add to an Existing Page */}
+          <div
+            style={{
+              padding: "18px 20px",
+              borderRadius: "12px",
+              border: "1px solid #e2e8f0",
+              backgroundColor: "#f8fafc",
+              display: "flex",
+              flexDirection: "column",
+              gap: "12px",
+              boxShadow: "0 1px 2px rgba(0, 0, 0, 0.04)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <div
+                style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "8px",
+                  backgroundColor: "#e2e8f0",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#475569",
+                  flexShrink: 0,
+                }}
+              >
+                <Layers size={18} strokeWidth={2.2} />
+              </div>
+              <div>
+                <div style={{ fontSize: "15px", fontWeight: "600", color: "#1e293b" }}>
+                  Option 2: Add as a Section to an Existing Page
+                </div>
+                <div style={{ fontSize: "12px", color: "#64748b" }}>
+                  Embed on your Homepage, About Us, or a custom landing page
+                </div>
+              </div>
+            </div>
+
+            <s-paragraph color="subdued">
+              Select where you want to embed the all-store reviews section in your theme editor:
+            </s-paragraph>
+
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+              <s-button
+                variant="secondary"
+                onClick={() => window.open(pageEditorUrl, "_blank", "noopener,noreferrer")}
+              >
+                Add to Standard Page Template ↗
+              </s-button>
+              <s-button
+                variant="secondary"
+                onClick={() => window.open(homeEditorUrl, "_blank", "noopener,noreferrer")}
+              >
+                Add to Homepage ↗
+              </s-button>
+            </div>
+          </div>
+
+          {/* Helpful Navigation Tip */}
+          <div style={{ padding: "10px 14px", backgroundColor: "#fffbeb", border: "1px solid #fef3c7", borderRadius: "8px", fontSize: "12px", color: "#92400e", display: "flex", alignItems: "center", gap: "6px" }}>
+            <span>💡</span>
+            <span>
+              <strong>Tip:</strong> After creating your page, remember to link it in your store&apos;s header or footer menu under <strong>Online Store &gt; Navigation</strong>.
+            </span>
+          </div>
+        </s-stack>
+
+        <s-button
+          slot="secondary-actions"
+          commandFor="all-reviews-install-modal"
+          command="--hide"
+          onClick={handleCloseAllReviewsModal}
+        >
+          Cancel
         </s-button>
       </s-modal>
     );
@@ -1129,7 +1367,13 @@ export default function WidgetsPage() {
                           <s-button
                             size="slim"
                             variant="primary"
-                            onClick={() => window.open(editorUrl, "_blank", "noopener,noreferrer")}
+                            onClick={() => {
+                              if (widget.id === "all_reviews_page") {
+                                handleOpenAllReviewsModal();
+                              } else {
+                                window.open(editorUrl, "_blank", "noopener,noreferrer");
+                              }
+                            }}
                           >
                             Install ↗
                           </s-button>
@@ -1152,6 +1396,7 @@ export default function WidgetsPage() {
         </s-grid>
       </s-stack>
       {renderUpgradeProModal()}
+      {renderAllReviewsModal()}
     </s-page>
   );
 }

@@ -1,12 +1,20 @@
 {{ 'reviora-widget.css' | asset_url | stylesheet_tag }}
 <script src="{{ 'reviora-widget.js' | asset_url }}" defer="defer"></script>
 
-<div class="reviora-qa-block" style="margin: {{ block.settings.margin_top | default: 32 }}px 0 {{ block.settings.margin_bottom | default: 32 }}px 0;">
+<div class="page-width reviora-qa-section-wrapper" style="width: 100%; max-width: 1120px; margin: {{ block.settings.margin_top | default: 32 }}px auto {{ block.settings.margin_bottom | default: 32 }}px auto; padding: 0 16px; box-sizing: border-box;">
+  {% assign current_product_id = product.handle | default: product.id %}
+  {% if current_product_id == blank and template.name != 'product' %}
+    {% assign current_product_id = 'demo-snowboard' %}
+  {% endif %}
+
   <reviora-qa-widget
     data-shop="{{ shop.myshopify_domain | default: shop.domain }}"
-    data-product-id="{{ product.handle }}"
+    data-product-id="{{ current_product_id }}"
+    data-product-handle="{{ product.handle | default: '' }}"
+    data-product-title="{{ product.title | escape }}"
     data-heading="{{ block.settings.heading | default: 'Customer Questions & Answers' }}"
-    data-accent-color="{{ block.settings.accent_color | default: '#0F172A' }}">
+    data-accent-color="{{ block.settings.accent_color | default: '#0F172A' }}"
+    data-api-url="{{ block.settings.api_url }}">
   </reviora-qa-widget>
 </div>
 
@@ -26,6 +34,12 @@
       "id": "accent_color",
       "label": "Accent Color",
       "default": "#0F172A"
+    },
+    {
+      "type": "text",
+      "id": "api_url",
+      "label": "App API URL",
+      "info": "Leave blank or paste app root domain (e.g. https://reviora-62qh.onrender.com). Do not add /app"
     },
     {
       "type": "range",

@@ -1840,43 +1840,313 @@
   // =========================================================
   class RevioraQaWidget extends HTMLElement {
     connectedCallback() {
+      this.shop =
+        this.getAttribute("data-shop") ||
+        window.Shopify?.shop ||
+        (window.location.hostname.includes("myshopify.com") ? window.location.hostname : "");
+
+      let pId =
+        this.getAttribute("data-product-handle") ||
+        this.getAttribute("data-product-id") ||
+        "";
+      if (!pId) {
+        const match = window.location.pathname.match(/\/products\/([^/?#]+)/);
+        if (match && match[1]) {
+          pId = decodeURIComponent(match[1]);
+        }
+      }
+      this.productId = pId || "general";
+      this.productHandle = this.getAttribute("data-product-handle") || (pId !== "general" ? pId : "");
+      this.productTitle = this.getAttribute("data-product-title") || "";
       this.heading = this.getAttribute("data-heading") || "Customer Questions & Answers";
       this.accentColor = this.getAttribute("data-accent-color") || "#0F172A";
+      this.apiUrl =
+        cleanBaseUrl(this.getAttribute("data-api-url")) ||
+        window.RevioraApiUrl ||
+        "https://reviora-62qh.onrender.com";
+
+      this.storageKey = `reviora_qa_${this.shop}_${this.productId}`;
+
+      this.defaultQA = [
+        {
+          q: "How does the sizing run for this product?",
+          asker: "Verified Customer • 2 days ago",
+          a: "It fits true to size! If you prefer a more relaxed or loose fit, we recommend ordering one size up.",
+          answerer: "Store Team",
+          isPending: false,
+        },
+        {
+          q: "Is this item covered under warranty?",
+          asker: "Verified Customer • 1 week ago",
+          a: "Yes! All authentic items purchased directly from our store are covered by our 1-year replacement warranty.",
+          answerer: "Store Team",
+          isPending: false,
+        },
+      ];
+
+      this.serverQuestions = [];
+      this.render();
+      this.attachListeners();
+      this.fetchQuestions();
+    }
+
+    async fetchQuestions() {
+      if (!this.shop) return;
+      try {
+        const res = await fetch(
+          `${this.apiUrl}/api/qa?shop=${encodeURIComponent(this.shop)}&productId=${encodeURIComponent(this.productId)}`,
+          { headers: { Accept: "application/json" } }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data.questions) && data.questions.length > 0) {
+            this.serverQuestions = data.questions.map((item) => ({
+              q: item.question,
+              asker: item.askerName
+                ? `${item.askerName} • ${item.createdAt ? new Date(item.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "Recently"}`
+                : "Shopper",
+              a: item.answer || "Answer pending...",
+              answerer: item.answeredBy || "Store Team",
+              isPending: !item.answer,
+            }));
+            const listEl = this.querySelector("#reviora-qa-list");
+            if (listEl) {
+              listEl.innerHTML = this.renderQuestionsHtml(this.getAllQuestions());
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Reviora QA API fetch fallback:", err);
+      }
+    }
+
+    getCustomQuestions() {
+      try {
+        const stored = localStorage.getItem(this.storageKey);
+        return stored ? JSON.parse(stored) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    saveQuestion(newQ) {
+      try {
+        const current = this.getCustomQuestions();
+        current.unshift(newQ);
+        localStorage.setItem(this.storageKey, JSON.stringify(current));
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    getAllQuestions() {
+      const customLocal = this.getCustomQuestions();
+      if (this.serverQuestions && this.serverQuestions.length > 0) {
+        return [...customLocal, ...this.serverQuestions];
+      }
+      if (customLocal.length > 0) {
+        return [...customLocal, ...this.defaultQA];
+      }
+      return this.defaultQA;
+    }
+
+    render() {
+      const allQuestions = this.getAllQuestions();
+
       this.innerHTML = `
-        <div class="reviora-qa-block">
-          <div class="reviora-header" style="padding:24px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
-              <div>
-                <h2 class="reviora-main-heading" style="font-size:20px;">${this.heading}</h2>
-                <p style="margin:4px 0 0 0;font-size:13px;color:#64748b;">Have a question? Ask our community or store support.</p>
-              </div>
-              <button type="button" class="reviora-write-btn" style="background:${this.accentColor};color:#fff;padding:8px 18px;font-size:13px;">
-                Ask a Question
+        <div class="reviora-qa-card" style="--reviora-primary: ${this.accentColor};">
+          <div class="reviora-qa-header-row">
+            <div>
+              <h2 class="reviora-qa-heading">${this.heading}</h2>
+              <p class="reviora-qa-subheading">Have questions? Ask our verified community or store staff.</p>
+            </div>
+            <button type="button" class="reviora-qa-ask-btn" id="reviora-qa-ask-btn">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              Ask a Question
+            </button>
+          </div>
+
+          <!-- Collapsible Question Form Box -->
+          <div id="reviora-qa-form-box" class="reviora-qa-form-box" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <div style="font-size: 16px; font-weight: 700; color: #0f172a;">Ask a Question</div>
+              <button type="button" id="reviora-qa-close-form" style="background: none; border: none; font-size: 13px; color: #64748b; cursor: pointer; text-decoration: underline; padding: 4px;">
+                Cancel
               </button>
             </div>
-            <div class="reviora-qa-item">
-              <div class="reviora-qa-item-q">
-                <span style="background:#0ea5e9;color:#fff;border-radius:4px;padding:2px 6px;font-size:11px;font-weight:800;">Q</span>
-                <span>How does sizing run for this product?</span>
+
+            <form id="reviora-qa-form">
+              <div class="reviora-qa-form-grid">
+                <div>
+                  <label style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 6px;">
+                    Your Name <span style="color:#ef4444;">*</span>
+                  </label>
+                  <input type="text" id="reviora-qa-name" class="reviora-qa-input" required placeholder="e.g. Alex M." />
+                </div>
+                <div>
+                  <label style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 6px;">
+                    Your Email <span style="color:#ef4444;">*</span>
+                  </label>
+                  <input type="email" id="reviora-qa-email" class="reviora-qa-input" required placeholder="name@example.com" />
+                </div>
               </div>
-              <div class="reviora-qa-item-a">
-                <span style="background:#10b981;color:#fff;border-radius:4px;padding:2px 6px;font-size:11px;font-weight:800;">A</span>
-                <span>It fits true to size! If you prefer a relaxed or loose fit, we recommend ordering one size up.</span>
+
+              <div style="margin-bottom: 16px;">
+                <label style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 6px;">
+                  What is your question? <span style="color:#ef4444;">*</span>
+                </label>
+                <textarea id="reviora-qa-text" class="reviora-qa-textarea" required rows="3" placeholder="Ask about sizing, materials, delivery, or warranty..."></textarea>
               </div>
+
+              <div style="display: flex; justify-content: flex-end; align-items: center; gap: 10px;">
+                <button type="submit" class="reviora-qa-ask-btn" id="reviora-qa-submit-btn" style="padding: 10px 24px;">
+                  Submit Question
+                </button>
+              </div>
+            </form>
+
+            <div id="reviora-qa-success" style="display: none; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 14px 18px; color: #065f46; font-size: 14px; text-align: center; margin-top: 10px;">
+              ✓ <strong>Thank you!</strong> Your question has been submitted. Our store staff will answer it shortly.
             </div>
-            <div class="reviora-qa-item">
-              <div class="reviora-qa-item-q">
-                <span style="background:#0ea5e9;color:#fff;border-radius:4px;padding:2px 6px;font-size:11px;font-weight:800;">Q</span>
-                <span>Is this item covered under the 1-year warranty?</span>
-              </div>
-              <div class="reviora-qa-item-a">
-                <span style="background:#10b981;color:#fff;border-radius:4px;padding:2px 6px;font-size:11px;font-weight:800;">A</span>
-                <span>Yes, all our authentic products include a full 1-year manufacturer warranty with hassle-free replacement.</span>
+          </div>
+
+          <!-- Questions List -->
+          <div class="reviora-qa-list" id="reviora-qa-list">
+            ${this.renderQuestionsHtml(allQuestions)}
+          </div>
+        </div>
+      `;
+    }
+
+    renderQuestionsHtml(questions) {
+      if (!questions || questions.length === 0) {
+        return `<div style="text-align:center;padding:24px;color:#94a3b8;font-size:14px;">No questions asked yet. Be the first to ask!</div>`;
+      }
+
+      return questions.map((item) => `
+        <div class="reviora-qa-item">
+          <div class="reviora-qa-item-q">
+            <span class="reviora-qa-badge-q">Q</span>
+            <div>
+              <div class="reviora-qa-q-text">${item.q}</div>
+              <div class="reviora-qa-asker-meta">Asked by ${item.asker || "Shopper"}</div>
+            </div>
+          </div>
+          <div class="reviora-qa-item-a" style="${item.isPending ? 'border-left-color: #f59e0b;' : ''}">
+            <span class="reviora-qa-badge-a" style="${item.isPending ? 'background: #f59e0b;' : ''}">A</span>
+            <div>
+              <div class="reviora-qa-a-text">${item.a}</div>
+              <div class="reviora-qa-answerer-meta" style="${item.isPending ? 'color: #b45309;' : ''}">
+                ${item.isPending ? '⏳ Awaiting answer by Store Support' : `✓ Answered by ${item.answerer || "Store Team"}`}
               </div>
             </div>
           </div>
         </div>
-      `;
+      `).join("");
+    }
+
+    attachListeners() {
+      const askBtn = this.querySelector("#reviora-qa-ask-btn");
+      const formBox = this.querySelector("#reviora-qa-form-box");
+      const closeBtn = this.querySelector("#reviora-qa-close-form");
+      const form = this.querySelector("#reviora-qa-form");
+      const successEl = this.querySelector("#reviora-qa-success");
+      const submitBtn = this.querySelector("#reviora-qa-submit-btn");
+
+      if (askBtn && formBox) {
+        askBtn.addEventListener("click", () => {
+          const isOpen = formBox.style.display !== "none";
+          formBox.style.display = isOpen ? "none" : "block";
+          if (!isOpen) {
+            formBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            const input = formBox.querySelector("#reviora-qa-name");
+            if (input) input.focus();
+          }
+        });
+      }
+
+      if (closeBtn && formBox) {
+        closeBtn.addEventListener("click", () => {
+          formBox.style.display = "none";
+        });
+      }
+
+      if (form) {
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const nameInput = this.querySelector("#reviora-qa-name");
+          const emailInput = this.querySelector("#reviora-qa-email");
+          const textInput = this.querySelector("#reviora-qa-text");
+
+          const name = nameInput ? nameInput.value.trim() : "";
+          const email = emailInput ? emailInput.value.trim() : "";
+          const qText = textInput ? textInput.value.trim() : "";
+
+          if (!name || !email || !qText) return;
+
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Submitting...";
+          }
+
+          const newQuestion = {
+            q: qText,
+            asker: `${name} • Just now`,
+            a: "Thank you for asking! Our support staff has received your question and will answer it shortly.",
+            answerer: "Store Support",
+            isPending: true,
+          };
+
+          this.saveQuestion(newQuestion);
+
+          // Submit question to backend database
+          try {
+            await fetch(`${this.apiUrl}/api/qa`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+              },
+              body: JSON.stringify({
+                shop: this.shop,
+                productId: this.productId,
+                productHandle: this.productHandle || "",
+                productTitle: this.productTitle || "",
+                question: qText,
+                askerName: name,
+                askerEmail: email,
+              }),
+            });
+          } catch (err) {
+            console.warn("Reviora QA post error:", err);
+          }
+
+          if (form) form.style.display = "none";
+          if (successEl) successEl.style.display = "block";
+
+          const listEl = this.querySelector("#reviora-qa-list");
+          if (listEl) {
+            listEl.innerHTML = this.renderQuestionsHtml(this.getAllQuestions());
+          }
+
+          setTimeout(() => {
+            if (formBox) formBox.style.display = "none";
+            if (form) {
+              form.reset();
+              form.style.display = "block";
+            }
+            if (successEl) successEl.style.display = "none";
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.textContent = "Submit Question";
+            }
+          }, 3500);
+        });
+      }
     }
   }
 
