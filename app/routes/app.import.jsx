@@ -478,14 +478,6 @@ export default function ImportPage() {
               <s-paragraph>{exportFetcher.data.exportError}</s-paragraph>
             </s-banner>
           )}
-
-          <div style={{ marginTop: "12px" }}>
-            <s-banner tone="info" heading="Authentic Reviews & Product Policy">
-              <s-paragraph>
-                Only import authentic reviews for products you sell that you have legal rights and permissions to use. Falsifying, fabricating, or copying unauthorized product reviews violates Shopify&apos;s Partner Program Agreement and Acceptable Use Policy.
-              </s-paragraph>
-            </s-banner>
-          </div>
         </div>
 
         {/* =========================================================================

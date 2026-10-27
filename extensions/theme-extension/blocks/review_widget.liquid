@@ -13,8 +13,7 @@
     data-product-id="{{ current_product_id }}"
     data-product-handle="{{ product.handle }}"
     data-product-title="{{ product.title }}"
-    data-star-color="{{ block.settings.star_color | default: '#FFB800' }}"
-    data-api-url="{{ block.settings.api_url }}"></reviora-reviews-widget>
+    data-star-color="{{ block.settings.star_color | default: '#FFB800' }}"></reviora-reviews-widget>
 </div>
 
 {% schema %}
@@ -27,11 +26,6 @@
         "id": "star_color",
         "label": "Star Rating Color",
         "default": "#FFB800"
-      }, {
-        "type": "text",
-        "id": "api_url",
-        "label": "App API URL",
-        "info": "Leave blank or paste app root domain (e.g. https://reviora-62qh.onrender.com). Do not add /app"
       }, {
         "type": "range",
         "id": "margin_top",

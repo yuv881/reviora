@@ -1694,25 +1694,50 @@
   // =========================================================
   class RevioraUgcMediaGrid extends HTMLElement {
     connectedCallback() {
-      this.shop = this.getAttribute("data-shop") || window.Shopify?.shop || "";
+      this.shop =
+        this.getAttribute("data-shop") ||
+        window.Shopify?.shop ||
+        (window.location.hostname.includes("myshopify.com") ? window.location.hostname : "");
       this.heading = this.getAttribute("data-heading") || "Customer Photos & Videos";
       this.subheading = this.getAttribute("data-subheading") || "Real photos shared by verified customers";
       this.columns = this.getAttribute("data-columns") || "4";
       this.starColor = this.getAttribute("data-star-color") || "#FFB800";
+      this.apiUrl =
+        cleanBaseUrl(this.getAttribute("data-api-url")) ||
+        window.RevioraApiUrl ||
+        "https://reviora-62qh.onrender.com";
+
       this.render();
       this.fetchMedia();
     }
 
     async fetchMedia() {
-      try {
-        const res = await fetch(`/apps/reviora/api/reviews?shop=${encodeURIComponent(this.shop)}&limit=20`);
-        if (res.ok) {
-          const data = await res.json();
-          const reviewsWithMedia = (data.reviews || []).filter((r) => r.media && r.media.length > 0);
-          this.renderGrid(reviewsWithMedia);
+      const base = this.apiUrl || window.RevioraApiUrl || "https://reviora-62qh.onrender.com";
+      const shopParam = encodeURIComponent(this.shop || "");
+      const urls = [
+        `${base}/api/reviews?shop=${shopParam}&productId=all&limit=50`,
+        `/apps/reviora/api/reviews?shop=${shopParam}&limit=50`,
+        `/api/reviews?shop=${shopParam}&limit=50`,
+      ];
+
+      for (const endpoint of urls) {
+        try {
+          const res = await fetch(endpoint, {
+            headers: { Accept: "application/json" },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const reviewsWithMedia = (data.reviews || []).filter(
+              (r) => r.media && r.media.length > 0
+            );
+            if (reviewsWithMedia.length > 0) {
+              this.renderGrid(reviewsWithMedia);
+              return;
+            }
+          }
+        } catch (e) {
+          // try next endpoint fallback
         }
-      } catch (e) {
-        console.warn("[Reviora] UGC Grid error", e);
       }
     }
 
@@ -1752,15 +1777,37 @@
       const grid = this.querySelector("#reviora-ugc-grid-items");
       if (!grid) return;
 
-      grid.innerHTML = reviews.slice(0, 12).map((r, idx) => {
-        const m = r.media[0];
-        const isVideo = m.mediaType === "VIDEO" || /\.(mp4|webm)($|\?)/i.test(m.url);
+      const mediaItems = [];
+      reviews.forEach((r) => {
+        (r.media || []).forEach((m, mIdx) => {
+          if (m && m.url) {
+            mediaItems.push({
+              review: r,
+              media: m,
+              mediaIdx: mIdx,
+            });
+          }
+        });
+      });
+
+      if (mediaItems.length === 0) return;
+
+      grid.innerHTML = mediaItems.slice(0, 16).map((item, idx) => {
+        const m = item.media;
+        const r = item.review;
+        const isVideo = m.mediaType === "VIDEO" || (m.url && /\.(mp4|webm|mov)($|\?)/i.test(m.url));
         return `
-          <div class="reviora-ugc-tile" data-idx="${idx}">
-            ${isVideo ? `<video src="${m.url}" muted playsinline loop></video>` : `<img src="${m.url}" alt="Customer photo" loading="lazy">`}
-            <div class="reviora-ugc-tile-overlay">
-              <div style="font-weight:700;font-size:12px;">${r.authorName}</div>
-              <div>${renderStarsSvg(r.rating || 5, this.starColor, 11)}</div>
+          <div class="reviora-ugc-tile" data-media-idx="${idx}" style="position:relative;overflow:hidden;border-radius:12px;background:#0f172a;cursor:pointer;">
+            ${isVideo
+              ? `<video src="${m.url}" muted playsinline loop style="width:100%;height:100%;object-fit:cover;display:block;"></video><span style="position:absolute;top:10px;right:10px;background:rgba(15,23,42,0.8);color:#fff;padding:3px 7px;border-radius:6px;font-size:10px;font-weight:700;">▶ Video</span>`
+              : `<img src="${m.url}" alt="Customer photo by ${r.authorName || 'Buyer'}" style="width:100%;height:100%;object-fit:cover;display:block;" loading="lazy">`
+            }
+            <div class="reviora-ugc-tile-overlay" style="position:absolute;bottom:0;left:0;right:0;padding:12px;background:linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 70%, transparent 100%);color:#fff;display:flex;justify-content:space-between;align-items:flex-end;">
+              <div>
+                <div style="font-weight:700;font-size:12px;">${r.authorName || "Verified Customer"}</div>
+                <div style="font-size:10px;opacity:0.85;">${r.title || r.body || "Verified Buyer"}</div>
+              </div>
+              <div style="color:${this.starColor};font-size:11px;letter-spacing:1px;">${renderStarsSvg(r.rating || 5, this.starColor, 11)}</div>
             </div>
           </div>
         `;
@@ -1768,10 +1815,10 @@
 
       grid.querySelectorAll(".reviora-ugc-tile").forEach((tile) => {
         tile.onclick = () => {
-          const idx = Number(tile.getAttribute("data-idx"));
-          const review = reviews[idx];
-          if (review && review.media && review.media.length > 0) {
-            globalLightbox.open(review.media, 0, review.authorName);
+          const idx = Number(tile.getAttribute("data-media-idx"));
+          const item = mediaItems[idx];
+          if (item && item.review && item.review.media && item.review.media.length > 0) {
+            globalLightbox.open(item.review.media, item.mediaIdx, item.review.authorName);
           }
         };
       });

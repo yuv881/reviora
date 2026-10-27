@@ -457,12 +457,17 @@ export const widgetsConfig = [
     blockName: "Trust & Checkout Badge",
     template: "product",
     defaultSettings: {
-      buttonText: "4.9/5 from 1,280+ Verified Buyers",
+      buttonText: "{rating}/5 from {count}+ Verified Buyers",
       starColor: "#FFB800",
       badgeColor: "#059669",
       accentColor: "#0F172A",
+      showVerifiedBadge: true,
+      hideIfEmpty: false,
     },
-    snippet: () => `<div class="reviora-trust-badge-pill">★ 4.9/5 from 1,280+ Verified Buyers</div>`,
+    snippet: (settings = {}) => {
+      const text = settings.buttonText || "{rating}/5 from {count}+ Verified Buyers";
+      return `<div class="reviora-trust-badge-pill">★ ${text}</div>`;
+    },
     preview: {
       gradient: "linear-gradient(135deg, #ccfbf1 0%, #99f6e4 50%, #ccfbf1 100%)",
       accentColor: "#0f766e",

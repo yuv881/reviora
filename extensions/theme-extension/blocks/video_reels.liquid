@@ -23,7 +23,6 @@
     data-star-color="{{ block.settings.star_color | default: '#FFB800' }}"
     data-limit="{{ block.settings.limit | default: 8 }}"
     data-autoplay="{{ block.settings.autoplay | default: false }}"
-    data-api-url="{{ block.settings.api_url }}"
   ></reviora-reviews-carousel>
 </div>
 
@@ -70,12 +69,6 @@
       "id": "autoplay",
       "label": "Auto-scroll Carousel",
       "default": false
-    },
-    {
-      "type": "text",
-      "id": "api_url",
-      "label": "App API URL",
-      "info": "Leave blank or paste app root domain (e.g. https://reviora-62qh.onrender.com). Do not add /app"
     },
     {
       "type": "range",

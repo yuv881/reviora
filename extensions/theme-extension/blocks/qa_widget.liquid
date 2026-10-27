@@ -13,8 +13,7 @@
     data-product-handle="{{ product.handle | default: '' }}"
     data-product-title="{{ product.title | escape }}"
     data-heading="{{ block.settings.heading | default: 'Customer Questions & Answers' }}"
-    data-accent-color="{{ block.settings.accent_color | default: '#0F172A' }}"
-    data-api-url="{{ block.settings.api_url }}">
+    data-accent-color="{{ block.settings.accent_color | default: '#0F172A' }}">
   </reviora-qa-widget>
 </div>
 
@@ -34,12 +33,6 @@
       "id": "accent_color",
       "label": "Accent Color",
       "default": "#0F172A"
-    },
-    {
-      "type": "text",
-      "id": "api_url",
-      "label": "App API URL",
-      "info": "Leave blank or paste app root domain (e.g. https://reviora-62qh.onrender.com). Do not add /app"
     },
     {
       "type": "range",

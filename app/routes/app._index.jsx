@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLoaderData, useFetcher, useNavigate, Link } from "react-router";
+import { useLoaderData, useFetcher, useNavigate, Link, redirect } from "react-router";
 import { authenticate } from "../shopify.server.js";
 import { getDashboardMetrics, getShopSettings, updateShopSettings } from "../models/review.server.js";
 import { StoreReviews } from "../models/review.model.js";
@@ -67,6 +67,20 @@ export const loader = async ({ request }) => {
   const forceOnboarding =
     url.searchParams.get("onboarding") === "true" ||
     url.searchParams.get("onboarding") === "1";
+  const isTestParam =
+    url.searchParams.get("test") === "true" ||
+    url.searchParams.get("test") === "1";
+
+  // Redirect to dedicated /app/onboarding if onboarding requested or not completed
+  if (forceOnboarding || !shopSettings?.onboardingCompleted) {
+    const params = new URLSearchParams();
+    if (isTestParam) params.set("test", "true");
+    const step = url.searchParams.get("step");
+    if (step) params.set("step", step);
+    const qs = params.toString();
+    return redirect(`/app/onboarding${qs ? `?${qs}` : ""}`);
+  }
+
   const urlStep = parseInt(url.searchParams.get("step") || "0", 10);
   const dbStep = shopSettings?.onboardingStep || 1;
   let initialStep = urlStep > 0 ? urlStep : dbStep;
@@ -123,7 +137,7 @@ export const action = async ({ request }) => {
       const isTest = process.env.NODE_ENV !== "production";
       const cleanShop = session.shop.replace(".myshopify.com", "");
       const apiKey = process.env.SHOPIFY_API_KEY || "f79eb2d3832f37be2bb3a5c7c1efd416";
-      const returnUrl = `https://admin.shopify.com/store/${cleanShop}/apps/${apiKey}/app?onboarding=true&step=4`;
+      const returnUrl = `https://admin.shopify.com/store/${cleanShop}/apps/${apiKey}/app/onboarding?step=4${isTest ? "&test=true" : ""}`;
 
       const response = await admin.graphql(
         `#graphql
@@ -314,7 +328,7 @@ export default function DashboardPage() {
   // If app was installed first time and onboarding is incomplete, enforce unskippable wizard
   if (!isOnboardingCompleted) {
     return (
-      <s-page heading="Setup Guide" inlineSize="small">
+      <s-page heading="Setup Guide">
         <OnboardingWizard
           shop={shop}
           apiKey={apiKey}
@@ -348,7 +362,7 @@ export default function DashboardPage() {
         )}
 
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <s-button variant="secondary" onClick={() => setReplayOnboarding(true)}>
+          <s-button variant="secondary" onClick={() => navigate("/app/onboarding")}>
             Replay Setup Guide ↗
           </s-button>
         </div>

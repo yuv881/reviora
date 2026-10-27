@@ -410,6 +410,17 @@ export function WidgetLivePreview({
   // 6. TRUST & CHECKOUT BADGE
   if (widgetId === "trust_badge") {
     const alignment = settings.alignment || "center";
+    const rawTemplate = settings.buttonText || settings.badgeText || "{rating}/5 from {count}+ Verified Buyers";
+    const liveRating = String(avgScore || "4.9");
+    const liveCount = Number(totalReviewsCount || 1280).toLocaleString();
+
+    const displayText = rawTemplate
+      .replace(/{rating}/g, liveRating)
+      .replace(/{count}/g, liveCount);
+
+    const showVerified = settings.showVerifiedBadge !== false;
+    const badgeAccentColor = settings.accentColor || textColor;
+
     return (
       <div style={{ padding: "40px 20px", display: "flex", justifyContent: alignment === "center" ? "center" : alignment === "right" ? "flex-end" : "flex-start" }}>
         <div style={{
@@ -423,27 +434,29 @@ export function WidgetLivePreview({
           boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
         }}>
           <span style={{ display: "inline-flex", gap: "2px" }}>
-            {renderStars(5, 15)}
+            {renderStars(Number(liveRating) || 5, 15)}
           </span>
-          <span style={{ fontSize: "14px", fontWeight: "700", color: textColor }}>
-            {settings.buttonText || settings.badgeText || "4.9/5 from 1,280+ Verified Buyers"}
+          <span style={{ fontSize: "14px", fontWeight: "700", color: badgeAccentColor }}>
+            {displayText}
           </span>
-          <span style={{
-            color: badgeColor,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "4px",
-            fontSize: "12px",
-            fontWeight: "700",
-            background: `${badgeColor}15`,
-            padding: "3px 8px",
-            borderRadius: "999px",
-          }}>
-            <svg viewBox="0 0 24 24" style={{ width: "12px", height: "12px", fill: "currentColor" }}>
-              <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" />
-            </svg>
-            100% Verified
-          </span>
+          {showVerified && (
+            <span style={{
+              color: badgeColor,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+              fontSize: "12px",
+              fontWeight: "700",
+              background: `${badgeColor}15`,
+              padding: "3px 8px",
+              borderRadius: "999px",
+            }}>
+              <svg viewBox="0 0 24 24" style={{ width: "12px", height: "12px", fill: "currentColor" }}>
+                <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" />
+              </svg>
+              100% Verified
+            </span>
+          )}
         </div>
       </div>
     );

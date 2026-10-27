@@ -175,6 +175,7 @@ export default function WidgetsPage() {
   const [copiedSnippet, setCopiedSnippet] = useState(false);
   const [showSavedToast, setShowSavedToast] = useState(false);
   const [proModalWidget, setProModalWidget] = useState(null);
+  // eslint-disable-next-line no-unused-vars
   const [showAllReviewsModal, setShowAllReviewsModal] = useState(false);
 
   const handleOpenAllReviewsModal = () => {
@@ -706,11 +707,83 @@ export default function WidgetsPage() {
                   )}
 
                   {settings.buttonText !== undefined && (
-                    <s-text-field
-                      label="Button Text"
-                      value={settings.buttonText || ""}
-                      onInput={(e) => handleSettingChange("buttonText", e.target.value)}
-                    />
+                    activeWidget?.id === "trust_badge" ? (
+                      <s-stack gap="extra-tight">
+                        <s-text-field
+                          label="Badge Text Template"
+                          value={settings.buttonText || ""}
+                          onInput={(e) => handleSettingChange("buttonText", e.target.value)}
+                        />
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", marginTop: "4px" }}>
+                          <span style={{ fontSize: "11px", color: "#64748b" }}>Insert tag:</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const cur = settings.buttonText || "";
+                              handleSettingChange("buttonText", cur ? `${cur} {rating}` : "{rating}");
+                            }}
+                            style={{
+                              background: "#f1f5f9",
+                              border: "1px solid #cbd5e1",
+                              borderRadius: "4px",
+                              padding: "2px 7px",
+                              fontSize: "11px",
+                              fontWeight: "600",
+                              cursor: "pointer",
+                              color: "#0f172a",
+                            }}
+                          >
+                            &#123;rating&#125; (Avg Rating)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const cur = settings.buttonText || "";
+                              handleSettingChange("buttonText", cur ? `${cur} {count}` : "{count}");
+                            }}
+                            style={{
+                              background: "#f1f5f9",
+                              border: "1px solid #cbd5e1",
+                              borderRadius: "4px",
+                              padding: "2px 7px",
+                              fontSize: "11px",
+                              fontWeight: "600",
+                              cursor: "pointer",
+                              color: "#0f172a",
+                            }}
+                          >
+                            &#123;count&#125; (Review Count)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleSettingChange("buttonText", "{rating}/5 from {count}+ Verified Buyers");
+                            }}
+                            style={{
+                              background: "#ecfdf5",
+                              border: "1px solid #a7f3d0",
+                              borderRadius: "4px",
+                              padding: "2px 7px",
+                              fontSize: "11px",
+                              fontWeight: "600",
+                              cursor: "pointer",
+                              color: "#065f46",
+                            }}
+                          >
+                            Reset to Dynamic Default
+                          </button>
+                        </div>
+                        <s-text size="small" tone="subdued">
+                          Tags are automatically replaced with real review numbers on your live store.
+                        </s-text>
+                      </s-stack>
+                    ) : (
+                      <s-text-field
+                        label="Button Text"
+                        value={settings.buttonText || ""}
+                        onInput={(e) => handleSettingChange("buttonText", e.target.value)}
+                      />
+                    )
                   )}
 
                   {settings.tabText !== undefined && (
@@ -739,6 +812,14 @@ export default function WidgetsPage() {
                       label="Show 'Verified Buyer' badge"
                       checked={Boolean(settings.showVerifiedBadge)}
                       onChange={(e) => handleSettingChange("showVerifiedBadge", e.target.checked)}
+                    />
+                  )}
+
+                  {settings.hideIfEmpty !== undefined && (
+                    <s-checkbox
+                      label="Hide widget if product has 0 reviews"
+                      checked={Boolean(settings.hideIfEmpty)}
+                      onChange={(e) => handleSettingChange("hideIfEmpty", e.target.checked)}
                     />
                   )}
 
